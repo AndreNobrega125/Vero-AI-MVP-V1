@@ -7,7 +7,7 @@ trechos críticos em vez de percorrer a rodovia inteira.
 
 ## Equipe
 
-Grupo: VeroAI
+Grupo 19 — VeroAI *(número provisório, a confirmar com o professor)*
 
 | Integrante | RM | Turma |
 | --- | --- | --- |
@@ -108,10 +108,10 @@ justamente para que a troca do modelo fosse isolada.
 `ultralytics`/PyTorch pode ainda não ter build compatível com essa versão. Se a
 instalação falhar, a solução é criar o venv do backend com Python 3.11 ou 3.12.
 
-### 2. Preencher o número oficial do grupo
+### 2. Confirmar o número do grupo com o professor
 
-O edital exige o número do grupo na primeira tela do vídeo. Hoje aparece como
-"a definir". Basta editar `groupNumber` em `frontend/src/lib/team.ts`.
+Está preenchido como **19**, mas ainda precisa ser confirmado. Se mudar, basta
+editar `groupNumber` em `frontend/src/lib/team.ts`.
 
 ### 3. Gravar o vídeo de entrega
 

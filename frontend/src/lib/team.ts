@@ -1,6 +1,6 @@
 export const TEAM = {
   groupName: "VeroAI",
-  groupNumber: "", // TODO: preencher número oficial do grupo
+  groupNumber: "19", // provisório — confirmar com o professor
   turma: "CCPG / CCPO",
   members: [
     { name: "André Ayello de Nobrega", rm: "561754", turma: "CCPG" },
