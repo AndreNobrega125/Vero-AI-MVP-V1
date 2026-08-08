@@ -1,0 +1,34 @@
+# Dependências
+node_modules/
+backend/venv/
+__pycache__/
+*.py[cod]
+
+# Build
+.next/
+out/
+build/
+dist/
+
+# Banco de dados local (dados de teste)
+backend/data/*.db
+
+# Ambiente e segredos
+.env
+.env.*
+*.pem
+
+# Modelos treinados (pesos grandes — distribuir fora do repo)
+*.pt
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor
+.vscode/
+.idea/
