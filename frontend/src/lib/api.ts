@@ -26,12 +26,21 @@ export type VideoRow = {
 };
 
 export const STATUS_STYLES: Record<string, string> = {
-  CRITICO: "bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30",
-  ALERTA:
-    "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30",
-  OK: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30",
+  CRITICO: "bg-negative/10 text-negative border-negative/30",
+  ALERTA: "bg-alert/15 text-[#946200] border-alert/40 dark:text-alert",
+  OK: "bg-positive/10 text-positive border-positive/30",
+};
+
+export const STATUS_BAR: Record<string, string> = {
+  CRITICO: "bg-negative",
+  ALERTA: "bg-alert",
+  OK: "bg-positive",
 };
 
 export function statusStyle(status: string) {
   return STATUS_STYLES[status] ?? "bg-black/5 dark:bg-white/10 border-black/10";
+}
+
+export function statusBar(status: string) {
+  return STATUS_BAR[status] ?? "bg-muted";
 }

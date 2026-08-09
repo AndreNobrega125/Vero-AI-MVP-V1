@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import {
   API_URL,
+  statusBar,
   statusStyle,
   type ProcessResult,
 } from "@/lib/api";
@@ -58,14 +59,19 @@ export default function ProcessarPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-12">
-      <h1 className="text-3xl font-bold">Teste do protótipo</h1>
-      <p className="mt-2 opacity-70">
+      <p className="text-sm font-semibold uppercase tracking-widest text-motiva">
+        Testar protótipo
+      </p>
+      <h1 className="mt-2 text-3xl font-bold text-motiva-dark dark:text-white">
+        Análise de vegetação
+      </h1>
+      <p className="mt-2 text-muted">
         Envie um vídeo gravado na rodovia. O sistema extrai um frame a cada 2
         segundos, estima a altura da vegetação em cada frame e calcula a média
         do trecho.
       </p>
 
-      <div className="mt-8 rounded-xl border border-black/10 p-6 dark:border-white/15">
+      <div className="mt-8 rounded-2xl border border-border-soft bg-white p-6 shadow-sm dark:border-white/15 dark:bg-white/5">
         <input
           ref={inputRef}
           type="file"
@@ -76,11 +82,11 @@ export default function ProcessarPage() {
         <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={() => inputRef.current?.click()}
-            className="rounded-lg border border-black/15 px-4 py-2 text-sm font-medium hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10"
+            className="rounded-lg border border-motiva/30 px-4 py-2 text-sm font-medium text-motiva-dark hover:bg-focus-light dark:border-white/20 dark:text-white dark:hover:bg-white/10"
           >
             Escolher vídeo
           </button>
-          <span className="text-sm opacity-70">
+          <span className="text-sm text-muted">
             {file ? file.name : "Nenhum arquivo selecionado"}
           </span>
         </div>
@@ -89,20 +95,20 @@ export default function ProcessarPage() {
           <video
             src={previewUrl}
             controls
-            className="mt-4 w-full rounded-lg border border-black/10 dark:border-white/15"
+            className="mt-4 w-full rounded-lg border border-border-soft dark:border-white/15"
           />
         )}
 
         <button
           onClick={handleSubmit}
           disabled={!file || loading}
-          className="mt-4 rounded-lg bg-foreground px-5 py-2.5 text-sm font-medium text-background disabled:opacity-40"
+          className="mt-4 rounded-lg bg-motiva px-5 py-2.5 text-sm font-medium text-white transition hover:bg-motiva-dark disabled:opacity-40"
         >
           {loading ? "Processando…" : "Analisar vegetação"}
         </button>
 
         {error && (
-          <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-400">
+          <p className="mt-4 rounded-lg border border-negative/30 bg-negative/10 px-4 py-3 text-sm text-negative">
             {error}
           </p>
         )}
@@ -110,14 +116,16 @@ export default function ProcessarPage() {
 
       {result && (
         <section className="mt-10">
-          <h2 className="text-xl font-semibold">Resultado da análise</h2>
+          <h2 className="text-xl font-semibold text-motiva-dark dark:text-white">
+            Resultado da análise
+          </h2>
 
           <div className="mt-4 grid gap-4 sm:grid-cols-3">
-            <div className="rounded-xl border border-black/10 p-5 dark:border-white/15">
-              <p className="text-sm opacity-60">Altura média</p>
-              <p className="mt-1 text-3xl font-bold">
+            <div className="rounded-xl border border-border-soft bg-white p-5 dark:border-white/15 dark:bg-white/5">
+              <p className="text-sm text-muted">Altura média</p>
+              <p className="mt-1 text-3xl font-bold text-motiva-dark dark:text-white">
                 {result.average_height_cm}
-                <span className="ml-1 text-lg font-normal opacity-60">cm</span>
+                <span className="ml-1 text-lg font-normal text-muted">cm</span>
               </p>
             </div>
             <div
@@ -126,15 +134,15 @@ export default function ProcessarPage() {
               <p className="text-sm opacity-70">Status do trecho</p>
               <p className="mt-1 text-3xl font-bold">{result.status}</p>
             </div>
-            <div className="rounded-xl border border-black/10 p-5 dark:border-white/15">
-              <p className="text-sm opacity-60">Frames analisados</p>
-              <p className="mt-1 text-3xl font-bold">
+            <div className="rounded-xl border border-border-soft bg-white p-5 dark:border-white/15 dark:bg-white/5">
+              <p className="text-sm text-muted">Frames analisados</p>
+              <p className="mt-1 text-3xl font-bold text-motiva-dark dark:text-white">
                 {result.readings.length}
               </p>
             </div>
           </div>
 
-          <h3 className="mt-8 text-sm font-semibold uppercase tracking-wide opacity-60">
+          <h3 className="mt-8 text-sm font-semibold uppercase tracking-wide text-muted">
             Leituras ao longo do trecho
           </h3>
           <div className="mt-3 space-y-1.5">
@@ -143,18 +151,12 @@ export default function ProcessarPage() {
                 key={reading.timestamp_s}
                 className="flex items-center gap-3 text-sm"
               >
-                <span className="w-14 shrink-0 tabular-nums opacity-60">
+                <span className="w-14 shrink-0 tabular-nums text-muted">
                   {reading.timestamp_s}s
                 </span>
-                <div className="h-5 flex-1 overflow-hidden rounded bg-black/5 dark:bg-white/10">
+                <div className="h-5 flex-1 overflow-hidden rounded bg-focus-light dark:bg-white/10">
                   <div
-                    className={`h-full rounded ${
-                      reading.status === "CRITICO"
-                        ? "bg-red-500"
-                        : reading.status === "ALERTA"
-                          ? "bg-amber-500"
-                          : "bg-emerald-500"
-                    }`}
+                    className={`h-full rounded ${statusBar(reading.status)}`}
                     style={{
                       width: `${(reading.height_cm / maxHeight) * 100}%`,
                     }}
@@ -167,9 +169,9 @@ export default function ProcessarPage() {
             ))}
           </div>
 
-          <p className="mt-6 text-sm opacity-60">
+          <p className="mt-6 text-sm text-muted">
             Resultado salvo na plataforma. Veja o histórico no{" "}
-            <a href="/dashboard" className="underline underline-offset-4">
+            <a href="/dashboard" className="font-medium text-motiva underline underline-offset-4">
               Dashboard
             </a>
             .

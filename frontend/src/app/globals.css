@@ -2,25 +2,36 @@
 
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #181e79;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-sora);
   --font-mono: var(--font-geist-mono);
+
+  /* Paleta oficial Motiva (extraída dos tokens de design de motiva.com.br) */
+  --color-motiva: #5e22f3;
+  --color-motiva-dark: #181e79;
+  --color-motiva-light: #8887f3;
+  --color-focus-light: #f3f3fe;
+  --color-positive: #53c42b;
+  --color-alert: #f6c643;
+  --color-negative: #de557c;
+  --color-border-soft: #d6d5eb;
+  --color-muted: #4f5266;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #0b0b17;
+    --foreground: #f3f3fe;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sora), Arial, Helvetica, sans-serif;
 }
