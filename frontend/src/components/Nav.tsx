@@ -4,9 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const LINKS = [
-  { href: "/", label: "Equipe" },
   { href: "/processar", label: "Testar Protótipo" },
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/cronograma", label: "Cronograma" },
 ];
 
 export default function Nav() {
@@ -15,10 +15,13 @@ export default function Nav() {
   return (
     <nav className="sticky top-0 z-10 border-b border-border-soft bg-white/80 backdrop-blur dark:border-white/10 dark:bg-[#0b0b17]/80">
       <div className="mx-auto flex max-w-5xl items-center gap-8 px-6 py-4">
-        <span className="flex items-center gap-2 font-bold tracking-tight text-motiva-dark dark:text-white">
+        <Link
+          href="/dashboard"
+          className="flex items-center gap-2 font-bold tracking-tight text-motiva-dark dark:text-white"
+        >
           <span className="h-2.5 w-2.5 rounded-full bg-motiva" />
           VeroAI
-        </span>
+        </Link>
         <div className="flex gap-6 text-sm">
           {LINKS.map((link) => (
             <Link

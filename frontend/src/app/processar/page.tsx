@@ -3,6 +3,9 @@
 import { useRef, useState } from "react";
 import {
   API_URL,
+  DURACAO_ASSUMIDA_S,
+  kmDaLeitura,
+  notificarDadosAtualizados,
   statusBar,
   statusStyle,
   type ProcessResult,
@@ -14,6 +17,9 @@ export default function ProcessarPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ProcessResult | null>(null);
+  const [kmInicio, setKmInicio] = useState("");
+  const [kmFim, setKmFim] = useState("");
+  const [nomeTrecho, setNomeTrecho] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   function handleSelect(selected: File | null) {
@@ -33,6 +39,9 @@ export default function ProcessarPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
+      if (kmInicio !== "") formData.append("km_inicio", kmInicio);
+      if (kmFim !== "") formData.append("km_fim", kmFim);
+      if (nomeTrecho !== "") formData.append("nome_trecho", nomeTrecho);
       const res = await fetch(`${API_URL}/api/process-video`, {
         method: "POST",
         body: formData,
@@ -42,6 +51,7 @@ export default function ProcessarPage() {
         throw new Error(detail?.detail ?? `Erro ${res.status}`);
       }
       setResult((await res.json()) as ProcessResult);
+      notificarDadosAtualizados();
     } catch (err) {
       setError(
         err instanceof Error
@@ -99,9 +109,62 @@ export default function ProcessarPage() {
           />
         )}
 
+        <div className="mt-4">
+          <label className="block text-xs font-medium text-muted">
+            Nome do trecho (opcional)
+          </label>
+          <input
+            type="text"
+            value={nomeTrecho}
+            onChange={(e) => setNomeTrecho(e.target.value)}
+            placeholder="ex: Km 50 a 51 — Trevo Sul"
+            className="mt-1 w-full max-w-sm rounded-lg border border-border-soft bg-white px-2 py-1.5 text-sm dark:border-white/20 dark:bg-white/10"
+          />
+          <p className="mt-1 text-xs text-muted">
+            Ajuda a identificar o trecho no dashboard. Este resultado é
+            marcado como dado real (distinto dos trechos de exemplo).
+          </p>
+        </div>
+
+        <div className="mt-4">
+          <label className="block text-xs font-medium text-muted">
+            Localização do trecho na rodovia (opcional)
+          </label>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <input
+              type="number"
+              value={kmInicio}
+              onChange={(e) => setKmInicio(e.target.value)}
+              placeholder="km início"
+              className="w-28 rounded-lg border border-border-soft bg-white px-2 py-1.5 text-sm dark:border-white/20 dark:bg-white/10"
+            />
+            <span className="text-muted">–</span>
+            <input
+              type="number"
+              value={kmFim}
+              onChange={(e) => setKmFim(e.target.value)}
+              placeholder="km fim"
+              className="w-28 rounded-lg border border-border-soft bg-white px-2 py-1.5 text-sm dark:border-white/20 dark:bg-white/10"
+            />
+          </div>
+          {kmInicio !== "" && kmFim !== "" && Number(kmFim) < Number(kmInicio) && (
+            <p className="mt-1 text-xs text-negative">
+              O km final deve ser maior ou igual ao km inicial.
+            </p>
+          )}
+          <p className="mt-1 text-xs text-muted">
+            Sem essa informação o trecho não entra no cronograma nem no filtro
+            por distância — mas dá para definir depois no Dashboard.
+          </p>
+        </div>
+
         <button
           onClick={handleSubmit}
-          disabled={!file || loading}
+          disabled={
+            !file ||
+            loading ||
+            (kmInicio !== "" && kmFim !== "" && Number(kmFim) < Number(kmInicio))
+          }
           className="mt-4 rounded-lg bg-motiva px-5 py-2.5 text-sm font-medium text-white transition hover:bg-motiva-dark disabled:opacity-40"
         >
           {loading ? "Processando…" : "Analisar vegetação"}
@@ -116,9 +179,27 @@ export default function ProcessarPage() {
 
       {result && (
         <section className="mt-10">
-          <h2 className="text-xl font-semibold text-motiva-dark dark:text-white">
-            Resultado da análise
-          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-xl font-semibold text-motiva-dark dark:text-white">
+              {result.nome_trecho || "Resultado da análise"}
+              {result.km_inicio !== null && result.km_fim !== null && (
+                <span className="ml-2 text-sm font-normal text-muted">
+                  · km {result.km_inicio} – {result.km_fim}
+                </span>
+              )}
+            </h2>
+            <button
+              onClick={() => {
+                handleSelect(null);
+                setKmInicio("");
+                setKmFim("");
+                setNomeTrecho("");
+              }}
+              className="text-sm font-medium text-motiva underline underline-offset-4"
+            >
+              Analisar outro vídeo
+            </button>
+          </div>
 
           <div className="mt-4 grid gap-4 sm:grid-cols-3">
             <div className="rounded-xl border border-border-soft bg-white p-5 dark:border-white/15 dark:bg-white/5">
@@ -142,31 +223,42 @@ export default function ProcessarPage() {
             </div>
           </div>
 
-          <h3 className="mt-8 text-sm font-semibold uppercase tracking-wide text-muted">
-            Leituras ao longo do trecho
-          </h3>
+          <div className="mt-8 flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-muted">
+              Leituras ao longo do trecho
+            </h3>
+            <span className="text-xs text-muted">
+              Duração assumida: {DURACAO_ASSUMIDA_S}s · captura a cada 2s
+            </span>
+          </div>
           <div className="mt-3 space-y-1.5">
-            {result.readings.map((reading) => (
-              <div
-                key={reading.timestamp_s}
-                className="flex items-center gap-3 text-sm"
-              >
-                <span className="w-14 shrink-0 tabular-nums text-muted">
-                  {reading.timestamp_s}s
-                </span>
-                <div className="h-5 flex-1 overflow-hidden rounded bg-focus-light dark:bg-white/10">
-                  <div
-                    className={`h-full rounded ${statusBar(reading.status)}`}
-                    style={{
-                      width: `${(reading.height_cm / maxHeight) * 100}%`,
-                    }}
-                  />
+            {result.readings.map((reading) => {
+              const km = kmDaLeitura(reading.timestamp_s, result.km_inicio, result.km_fim);
+              return (
+                <div
+                  key={reading.timestamp_s}
+                  className="flex items-center gap-3 text-sm"
+                >
+                  <span className="w-14 shrink-0 tabular-nums text-muted">
+                    {reading.timestamp_s}s
+                  </span>
+                  <span className="w-16 shrink-0 tabular-nums text-muted">
+                    {km !== null ? `km ${km}` : "—"}
+                  </span>
+                  <div className="h-5 flex-1 overflow-hidden rounded bg-focus-light dark:bg-white/10">
+                    <div
+                      className={`h-full rounded ${statusBar(reading.status)}`}
+                      style={{
+                        width: `${(reading.height_cm / maxHeight) * 100}%`,
+                      }}
+                    />
+                  </div>
+                  <span className="w-20 shrink-0 text-right tabular-nums">
+                    {reading.height_cm} cm
+                  </span>
                 </div>
-                <span className="w-20 shrink-0 text-right tabular-nums">
-                  {reading.height_cm} cm
-                </span>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <p className="mt-6 text-sm text-muted">

@@ -36,5 +36,17 @@ def init_db() -> None:
         )
         """
     )
+    _add_column_if_missing(conn, "videos", "km_inicio", "REAL")
+    _add_column_if_missing(conn, "videos", "km_fim", "REAL")
+    _add_column_if_missing(conn, "videos", "nome_trecho", "TEXT")
+    _add_column_if_missing(conn, "videos", "is_exemplo", "INTEGER NOT NULL DEFAULT 0")
+    _add_column_if_missing(conn, "videos", "rocada_solicitada_em", "TEXT")
+    _add_column_if_missing(conn, "videos", "rocada_agendada_para", "TEXT")
     conn.commit()
     conn.close()
+
+
+def _add_column_if_missing(conn: sqlite3.Connection, table: str, column: str, col_type: str) -> None:
+    existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+    if column not in existing:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
