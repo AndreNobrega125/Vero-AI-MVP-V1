@@ -35,3 +35,18 @@ body {
   color: var(--foreground);
   font-family: var(--font-sora), Arial, Helvetica, sans-serif;
 }
+
+/* O popup nativo de <select> ignora as classes dark: do Tailwind e herda a
+   cor de texto clara do body no modo escuro, ficando ilegível sobre o fundo
+   branco que o navegador usa para a lista de opções. A caixa fechada do
+   select deve continuar seguindo o tema do site (como os outros campos) —
+   só as opções da lista aberta (sempre em fundo claro) precisam de cor
+   forçada para ficarem legíveis. */
+select {
+  color-scheme: light;
+}
+
+select option {
+  color: #181e79;
+  background-color: #ffffff;
+}

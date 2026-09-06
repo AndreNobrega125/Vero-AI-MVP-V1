@@ -13,6 +13,9 @@ dist/
 # Banco de dados local (dados de teste)
 backend/data/*.db
 
+# Vídeo bruto do processamento mais recente (temporário, apagado a cada novo upload)
+backend/data/videos/
+
 # Ambiente e segredos
 .env
 .env.*

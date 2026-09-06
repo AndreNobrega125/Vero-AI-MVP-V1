@@ -11,19 +11,101 @@ export type Reading = {
 export type ProcessResult = {
   video_id: number;
   filename: string;
+  nome_trecho: string | null;
   average_height_cm: number;
   status: string;
   color: string;
+  km_inicio: number | null;
+  km_fim: number | null;
   readings: Reading[];
 };
 
 export type VideoRow = {
   id: number;
   filename: string;
+  nome_trecho: string | null;
+  is_exemplo: number;
   created_at: string;
   average_height_cm: number;
   status: string;
+  km_inicio: number | null;
+  km_fim: number | null;
+  rocada_solicitada_em: string | null;
+  rocada_agendada_para: string | null;
+  previsao_dias_ate_critico: number | null;
+  previsao_data_critico: string | null;
 };
+
+export type CronogramaItem = {
+  video_id: number;
+  filename: string;
+  nome_trecho: string | null;
+  is_exemplo: boolean;
+  km_inicio: number;
+  km_fim: number;
+  status: string;
+  average_height_cm: number;
+  dia: number;
+  distancia_anterior_km: number;
+  rocada_solicitada_em: string | null;
+  rocada_agendada_para: string | null;
+  previsao_dias_ate_critico: number | null;
+  previsao_data_critico: string | null;
+};
+
+export type CronogramaResponse = {
+  max_km_dia: number;
+  total_dias: number;
+  cronograma: CronogramaItem[];
+};
+
+export type Papel = "gestor" | "encarregado";
+
+export type Usuario = {
+  id: number;
+  nome: string;
+  papel: Papel;
+  cargo_detalhe: string | null;
+  rodovia: string | null;
+};
+
+export type Mensagem = {
+  id: number;
+  video_id: number;
+  destinatario: string;
+  cargo: string | null;
+  mensagem: string;
+  remetente: string;
+  tipo: "texto" | "solicitacao";
+  data_solicitada: string | null;
+  enviada_em: string;
+  is_exemplo: number;
+};
+
+/** Login mockado (sem senha) — só identifica "entrar como" pra fins de
+ * demonstração do fluxo gestor/encarregado. Não é autenticação real: não
+ * há verificação de identidade, token ou proteção de servidor por trás. */
+const CHAVE_USUARIO_LOGADO = "veroai_usuario_logado";
+
+export function getUsuarioLogado(): Usuario | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const bruto = window.localStorage.getItem(CHAVE_USUARIO_LOGADO);
+    return bruto ? (JSON.parse(bruto) as Usuario) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setUsuarioLogado(usuario: Usuario) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(CHAVE_USUARIO_LOGADO, JSON.stringify(usuario));
+}
+
+export function logout() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(CHAVE_USUARIO_LOGADO);
+}
 
 export const STATUS_STYLES: Record<string, string> = {
   CRITICO: "bg-negative/10 text-negative border-negative/30",
@@ -43,4 +125,131 @@ export function statusStyle(status: string) {
 
 export function statusBar(status: string) {
   return STATUS_BAR[status] ?? "bg-muted";
+}
+
+/** Rótulo exibido ao usuário — o código interno continua "ALERTA" (banco,
+ * filtros, STATUS_PRIORITY), só o texto na tela vira "Atenção" para bater
+ * com a nomenclatura das faixas regulatórias. */
+export const STATUS_LABELS: Record<string, string> = {
+  CRITICO: "Crítico",
+  ALERTA: "Atenção",
+  OK: "OK",
+};
+
+export function statusLabel(status: string) {
+  return STATUS_LABELS[status] ?? status;
+}
+
+export const STATUS_RECOMMENDATION: Record<string, string> = {
+  CRITICO: "Priorizar roçada imediata",
+  ALERTA: "Agendar roçada nos próximos dias",
+  OK: "Sem ação necessária",
+};
+
+export function statusRecommendation(status: string) {
+  return STATUS_RECOMMENDATION[status] ?? "—";
+}
+
+/** Duração assumida do trecho filmado, para estimar a posição em km de cada
+ * leitura ao longo do vídeo (o processamento real não mede velocidade —
+ * é uma aproximação de demonstração). */
+export const DURACAO_ASSUMIDA_S = 60;
+
+export function textoPrevisao(diasAteCritico: number | null, dataCritico: string | null): string | null {
+  if (diasAteCritico === null) return null;
+  if (diasAteCritico === 0) return null;
+  const dataFormatada = dataCritico
+    ? new Date(dataCritico + "T00:00:00").toLocaleDateString("pt-BR")
+    : null;
+  return `Previsão: atinge CRÍTICO em ~${diasAteCritico} dia${diasAteCritico > 1 ? "s" : ""}${dataFormatada ? ` (${dataFormatada})` : ""}`;
+}
+
+export function formatarDataBR(data: string): string {
+  return new Date(data + "T00:00:00").toLocaleDateString("pt-BR");
+}
+
+export function kmDaLeitura(
+  timestamp_s: number,
+  km_inicio: number | null,
+  km_fim: number | null,
+): number | null {
+  if (km_inicio === null || km_fim === null) return null;
+  const fracao = Math.min(1, timestamp_s / DURACAO_ASSUMIDA_S);
+  return Math.round((km_inicio + fracao * (km_fim - km_inicio)) * 100) / 100;
+}
+
+/** Canal para o Dashboard e o Cronograma avisarem um ao outro (mesma
+ * origem, abas diferentes) sempre que um trecho é alterado — solicitar
+ * roçada, agendar, editar localização ou processar um vídeo novo. */
+const CANAL_DADOS = "veroai-dados-atualizados";
+
+export function notificarDadosAtualizados() {
+  if (typeof window === "undefined" || !("BroadcastChannel" in window)) return;
+  const canal = new BroadcastChannel(CANAL_DADOS);
+  canal.postMessage("atualizado");
+  canal.close();
+}
+
+export function sugerirEquipe(encarregados: Usuario[], nomeTrecho: string | null): Usuario | null {
+  if (!nomeTrecho) return null;
+  const equipeDaRodovia = encarregados.find(
+    (e) => e.rodovia && nomeTrecho.toUpperCase().includes(e.rodovia),
+  );
+  return equipeDaRodovia ?? encarregados.find((e) => e.rodovia === null) ?? null;
+}
+
+export function sugerirMensagem(
+  nomeTrecho: string | null,
+  status: string,
+  alturaCm: number,
+): string {
+  const trecho = nomeTrecho ?? "trecho sem nome";
+  if (status === "CRITICO") {
+    return `Trecho ${trecho} está com vegetação a ${alturaCm}cm — status CRÍTICO. Por favor, priorize a roçada o quanto antes.`;
+  }
+  if (status === "ALERTA") {
+    return `Trecho ${trecho} está com vegetação a ${alturaCm}cm — status ATENÇÃO. Favor agendar a roçada nos próximos dias.`;
+  }
+  return `Trecho ${trecho} está com vegetação a ${alturaCm}cm — dentro do padrão (OK). Sem ação necessária no momento.`;
+}
+
+export function iniciais(nome: string): string {
+  const partes = nome.trim().split(/\s+/);
+  const primeira = partes[0]?.[0] ?? "";
+  const ultima = partes.length > 1 ? partes[partes.length - 1][0] : "";
+  return (primeira + ultima).toUpperCase();
+}
+
+const CORES_AVATAR = [
+  "bg-motiva",
+  "bg-positive",
+  "bg-alert",
+  "bg-negative",
+  "bg-motiva-light",
+];
+
+export function corAvatar(nome: string): string {
+  let hash = 0;
+  for (let i = 0; i < nome.length; i++) hash = (hash + nome.charCodeAt(i)) % CORES_AVATAR.length;
+  return CORES_AVATAR[hash];
+}
+
+export function horaChat(dataHora: string): string {
+  const [, hora] = dataHora.split(" ");
+  return hora ? hora.slice(0, 8) : dataHora;
+}
+
+export function dataHoraChat(dataHora: string): string {
+  const [data, hora] = dataHora.split(" ");
+  const dataFmt = formatarDataBR(data);
+  return hora ? `${dataFmt} ${hora.slice(0, 8)}` : dataFmt;
+}
+
+export function ouvirDadosAtualizados(callback: () => void): () => void {
+  if (typeof window === "undefined" || !("BroadcastChannel" in window)) {
+    return () => {};
+  }
+  const canal = new BroadcastChannel(CANAL_DADOS);
+  canal.onmessage = () => callback();
+  return () => canal.close();
 }
