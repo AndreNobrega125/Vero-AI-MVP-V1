@@ -1,3 +1,7 @@
+# opencv-python-headless (nao opencv-python) e obrigatorio no Railway: o
+# container nao tem libxcb/libGL, e o ultralytics tenta puxar opencv-python
+# (a versao com GUI) como dependencia transitiva. O build do Railway forca
+# a reinstalacao da variante headless por cima (ver Custom Build Command).
 fastapi
 uvicorn[standard]
 python-multipart
