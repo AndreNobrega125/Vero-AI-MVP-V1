@@ -9,6 +9,7 @@ import {
   notificarDadosAtualizados,
   ouvirDadosAtualizados,
   statusBar,
+  statusLabel,
   statusRecommendation,
   statusStyle,
   textoPrevisao,
@@ -34,20 +35,26 @@ export default function DashboardPage() {
   const [agendaForm, setAgendaForm] = useState("");
   const [buscandoHorarioId, setBuscandoHorarioId] = useState<number | null>(null);
 
-  function loadVideos() {
-    setLoading(true);
+  // Busca silenciosa: não mexe em `loading`, então não esconde o
+  // dashboard atrás de "Carregando…" a cada rodada do polling.
+  function buscarVideos() {
     const params = new URLSearchParams();
     if (kmRef !== "" && raioKm !== "") {
       params.set("km_ref", kmRef);
       params.set("raio_km", raioKm);
     }
     const query = params.toString();
-    fetch(`${API_URL}/api/videos${query ? `?${query}` : ""}`)
+    return fetch(`${API_URL}/api/videos${query ? `?${query}` : ""}`)
       .then((res) => {
         if (!res.ok) throw new Error(`Erro ${res.status}`);
         return res.json();
       })
-      .then(setVideos)
+      .then(setVideos);
+  }
+
+  function loadVideos() {
+    setLoading(true);
+    buscarVideos()
       .catch(() =>
         setError("Não foi possível carregar os dados. A API está rodando?"),
       )
@@ -60,9 +67,22 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    return ouvirDadosAtualizados(loadVideos);
+    return ouvirDadosAtualizados(() => buscarVideos().catch(() => {}));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Polling: outro gestor/vídeo processado em outro aparelho não avisa esta
+  // aba sozinho (BroadcastChannel só sincroniza abas do mesmo navegador) —
+  // sem isso, só apareceria dando refresh manual.
+  useEffect(() => {
+    const intervalo = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        buscarVideos().catch(() => {});
+      }
+    }, 4000);
+    return () => clearInterval(intervalo);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kmRef, raioKm]);
 
   async function salvarLocalizacao(id: number) {
     const km_inicio = parseFloat(locForm.km_inicio);
@@ -235,7 +255,7 @@ export default function DashboardPage() {
                 : "border-border-soft text-muted hover:bg-focus-light dark:border-white/20 dark:hover:bg-white/10"
             }`}
           >
-            {f === "TODOS" ? "Todos" : f}
+            {f === "TODOS" ? "Todos" : statusLabel(f)}
           </button>
         ))}
       </div>
@@ -327,7 +347,7 @@ export default function DashboardPage() {
 
       {!loading && !error && filtered.length === 0 && videos.length > 0 && !(kmRef !== "" && raioKm !== "") && (
         <p className="mt-8 text-muted">
-          Nenhum trecho com status {filter}.
+          Nenhum trecho com status {statusLabel(filter)}.
         </p>
       )}
 
@@ -437,7 +457,7 @@ export default function DashboardPage() {
                       <span
                         className={`rounded-full border px-2.5 py-1 text-xs font-medium ${statusStyle(video.status)}`}
                       >
-                        {video.status}
+                        {statusLabel(video.status)}
                       </span>
                     </td>
                     <td className="px-4 py-3">

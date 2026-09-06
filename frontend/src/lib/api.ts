@@ -59,6 +59,54 @@ export type CronogramaResponse = {
   cronograma: CronogramaItem[];
 };
 
+export type Papel = "gestor" | "encarregado";
+
+export type Usuario = {
+  id: number;
+  nome: string;
+  papel: Papel;
+  cargo_detalhe: string | null;
+  rodovia: string | null;
+};
+
+export type Mensagem = {
+  id: number;
+  video_id: number;
+  destinatario: string;
+  cargo: string | null;
+  mensagem: string;
+  remetente: string;
+  tipo: "texto" | "solicitacao";
+  data_solicitada: string | null;
+  enviada_em: string;
+  is_exemplo: number;
+};
+
+/** Login mockado (sem senha) — só identifica "entrar como" pra fins de
+ * demonstração do fluxo gestor/encarregado. Não é autenticação real: não
+ * há verificação de identidade, token ou proteção de servidor por trás. */
+const CHAVE_USUARIO_LOGADO = "veroai_usuario_logado";
+
+export function getUsuarioLogado(): Usuario | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const bruto = window.localStorage.getItem(CHAVE_USUARIO_LOGADO);
+    return bruto ? (JSON.parse(bruto) as Usuario) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setUsuarioLogado(usuario: Usuario) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(CHAVE_USUARIO_LOGADO, JSON.stringify(usuario));
+}
+
+export function logout() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(CHAVE_USUARIO_LOGADO);
+}
+
 export const STATUS_STYLES: Record<string, string> = {
   CRITICO: "bg-negative/10 text-negative border-negative/30",
   ALERTA: "bg-alert/15 text-[#946200] border-alert/40 dark:text-alert",
@@ -77,6 +125,19 @@ export function statusStyle(status: string) {
 
 export function statusBar(status: string) {
   return STATUS_BAR[status] ?? "bg-muted";
+}
+
+/** Rótulo exibido ao usuário — o código interno continua "ALERTA" (banco,
+ * filtros, STATUS_PRIORITY), só o texto na tela vira "Atenção" para bater
+ * com a nomenclatura das faixas regulatórias. */
+export const STATUS_LABELS: Record<string, string> = {
+  CRITICO: "Crítico",
+  ALERTA: "Atenção",
+  OK: "OK",
+};
+
+export function statusLabel(status: string) {
+  return STATUS_LABELS[status] ?? status;
 }
 
 export const STATUS_RECOMMENDATION: Record<string, string> = {
@@ -127,6 +188,61 @@ export function notificarDadosAtualizados() {
   const canal = new BroadcastChannel(CANAL_DADOS);
   canal.postMessage("atualizado");
   canal.close();
+}
+
+export function sugerirEquipe(encarregados: Usuario[], nomeTrecho: string | null): Usuario | null {
+  if (!nomeTrecho) return null;
+  const equipeDaRodovia = encarregados.find(
+    (e) => e.rodovia && nomeTrecho.toUpperCase().includes(e.rodovia),
+  );
+  return equipeDaRodovia ?? encarregados.find((e) => e.rodovia === null) ?? null;
+}
+
+export function sugerirMensagem(
+  nomeTrecho: string | null,
+  status: string,
+  alturaCm: number,
+): string {
+  const trecho = nomeTrecho ?? "trecho sem nome";
+  if (status === "CRITICO") {
+    return `Trecho ${trecho} está com vegetação a ${alturaCm}cm — status CRÍTICO. Por favor, priorize a roçada o quanto antes.`;
+  }
+  if (status === "ALERTA") {
+    return `Trecho ${trecho} está com vegetação a ${alturaCm}cm — status ATENÇÃO. Favor agendar a roçada nos próximos dias.`;
+  }
+  return `Trecho ${trecho} está com vegetação a ${alturaCm}cm — dentro do padrão (OK). Sem ação necessária no momento.`;
+}
+
+export function iniciais(nome: string): string {
+  const partes = nome.trim().split(/\s+/);
+  const primeira = partes[0]?.[0] ?? "";
+  const ultima = partes.length > 1 ? partes[partes.length - 1][0] : "";
+  return (primeira + ultima).toUpperCase();
+}
+
+const CORES_AVATAR = [
+  "bg-motiva",
+  "bg-positive",
+  "bg-alert",
+  "bg-negative",
+  "bg-motiva-light",
+];
+
+export function corAvatar(nome: string): string {
+  let hash = 0;
+  for (let i = 0; i < nome.length; i++) hash = (hash + nome.charCodeAt(i)) % CORES_AVATAR.length;
+  return CORES_AVATAR[hash];
+}
+
+export function horaChat(dataHora: string): string {
+  const [, hora] = dataHora.split(" ");
+  return hora ? hora.slice(0, 8) : dataHora;
+}
+
+export function dataHoraChat(dataHora: string): string {
+  const [data, hora] = dataHora.split(" ");
+  const dataFmt = formatarDataBR(data);
+  return hora ? `${dataFmt} ${hora.slice(0, 8)}` : dataFmt;
 }
 
 export function ouvirDadosAtualizados(callback: () => void): () => void {

@@ -1,14 +1,71 @@
-import sqlite3
-from pathlib import Path
+import os
 
-DB_PATH = Path(__file__).resolve().parent.parent / "data" / "veroai.db"
+import psycopg2
+import psycopg2.extras
+from dotenv import load_dotenv
+
+load_dotenv()
+
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
 
-def get_connection() -> sqlite3.Connection:
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+class _CursorWrapper:
+    """Cursor com fetchone/fetchall em formato dict (RealDictCursor),
+    compatível com o padrão dict(row) / row["coluna"] usado no resto do
+    código (herdado da época do sqlite3.Row)."""
+
+    def __init__(self, cursor):
+        self._cursor = cursor
+
+    @property
+    def rowcount(self):
+        return self._cursor.rowcount
+
+    def fetchone(self):
+        return self._cursor.fetchone()
+
+    def fetchall(self):
+        return self._cursor.fetchall()
+
+    def __iter__(self):
+        return iter(self._cursor)
+
+
+class _ConnectionWrapper:
+    """Compatibilidade com o padrão conn.execute(...) usado em todo o
+    main.py (herdado do sqlite3) — evita reescrever cada call site para
+    abrir cursor manualmente ao trocar para psycopg2."""
+
+    def __init__(self, conn):
+        self._conn = conn
+
+    def execute(self, query: str, params=()) -> _CursorWrapper:
+        cur = self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(query, params)
+        return _CursorWrapper(cur)
+
+    def executemany(self, query: str, seq_of_params) -> None:
+        cur = self._conn.cursor()
+        cur.executemany(query, seq_of_params)
+
+    def commit(self) -> None:
+        self._conn.commit()
+
+    def rollback(self) -> None:
+        self._conn.rollback()
+
+    def close(self) -> None:
+        self._conn.close()
+
+
+def get_connection() -> _ConnectionWrapper:
+    if not DATABASE_URL:
+        raise RuntimeError(
+            "DATABASE_URL não definida. Configure a connection string do "
+            "Supabase em backend/.env (variável DATABASE_URL) — veja o README."
+        )
+    conn = psycopg2.connect(DATABASE_URL)
+    return _ConnectionWrapper(conn)
 
 
 def init_db() -> None:
@@ -16,9 +73,9 @@ def init_db() -> None:
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS videos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             filename TEXT NOT NULL,
-            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            created_at TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS'),
             average_height_cm REAL,
             status TEXT
         )
@@ -27,7 +84,7 @@ def init_db() -> None:
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS readings (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             video_id INTEGER NOT NULL REFERENCES videos(id),
             timestamp_s REAL NOT NULL,
             height_cm REAL NOT NULL,
@@ -42,11 +99,66 @@ def init_db() -> None:
     _add_column_if_missing(conn, "videos", "is_exemplo", "INTEGER NOT NULL DEFAULT 0")
     _add_column_if_missing(conn, "videos", "rocada_solicitada_em", "TEXT")
     _add_column_if_missing(conn, "videos", "rocada_agendada_para", "TEXT")
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS mensagens (
+            id SERIAL PRIMARY KEY,
+            video_id INTEGER NOT NULL REFERENCES videos(id),
+            destinatario TEXT NOT NULL,
+            cargo TEXT,
+            mensagem TEXT NOT NULL,
+            enviada_em TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS')
+        )
+        """
+    )
+    _add_column_if_missing(conn, "mensagens", "remetente", "TEXT NOT NULL DEFAULT 'gestor'")
+    _add_column_if_missing(conn, "mensagens", "tipo", "TEXT NOT NULL DEFAULT 'texto'")
+    _add_column_if_missing(conn, "mensagens", "data_solicitada", "TEXT")
+    _add_column_if_missing(conn, "mensagens", "is_exemplo", "INTEGER NOT NULL DEFAULT 0")
+
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS usuarios (
+            id SERIAL PRIMARY KEY,
+            nome TEXT NOT NULL,
+            papel TEXT NOT NULL,
+            cargo_detalhe TEXT,
+            rodovia TEXT,
+            created_at TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS')
+        )
+        """
+    )
+    _seed_usuarios_padrao(conn)
+
     conn.commit()
     conn.close()
 
 
-def _add_column_if_missing(conn: sqlite3.Connection, table: str, column: str, col_type: str) -> None:
-    existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+def _seed_usuarios_padrao(conn: _ConnectionWrapper) -> None:
+    """Garante as 2 contas fixas de demonstração (login sem senha — não é
+    autenticação real, só identifica 'entrar como gestor/encarregado' para
+    a simulação de mensagens). Idempotente: só insere se a tabela estiver
+    vazia, não sobrescreve edições feitas depois."""
+    existentes = conn.execute("SELECT COUNT(*) AS total FROM usuarios").fetchone()
+    if existentes["total"] > 0:
+        return
+    conn.execute(
+        "INSERT INTO usuarios (nome, papel, cargo_detalhe, rodovia) VALUES (%s, %s, %s, %s)",
+        ("Ana Ribeiro", "gestor", "Gestora de conservação — Motiva", None),
+    )
+    conn.execute(
+        "INSERT INTO usuarios (nome, papel, cargo_detalhe, rodovia) VALUES (%s, %s, %s, %s)",
+        ("Carlos Andrade", "encarregado", "Encarregado de roçada — SP-330 (Anhanguera)", "SP-330"),
+    )
+
+
+def _add_column_if_missing(conn: _ConnectionWrapper, table: str, column: str, col_type: str) -> None:
+    existing = {
+        row["column_name"]
+        for row in conn.execute(
+            "SELECT column_name FROM information_schema.columns WHERE table_name = %s",
+            (table,),
+        ).fetchall()
+    }
     if column not in existing:
         conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")

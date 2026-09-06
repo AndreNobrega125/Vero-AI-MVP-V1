@@ -54,6 +54,21 @@ def extract_frames(video_path: str, interval_seconds: float = 2.0):
     return frames
 
 
+AREA_INTERESSE_FRACAO_INFERIOR = 0.35
+# Suposição de calibração: numa câmera veicular apontada para frente, a
+# vegetação do acostamento aparece na faixa inferior do quadro — o resto é
+# pista e céu, que não deveriam contar na cobertura. Sem recortar essa área,
+# a % de vegetação fica artificialmente baixa mesmo com grama alta, porque é
+# diluída pelo frame inteiro. Ajustar esta fração quando houver um vídeo de
+# referência real com o ângulo de câmera definitivo da Motiva.
+
+
+def _recortar_area_interesse(frame: np.ndarray) -> np.ndarray:
+    altura = frame.shape[0]
+    y_inicio = int(altura * (1 - AREA_INTERESSE_FRACAO_INFERIOR))
+    return frame[y_inicio:, :]
+
+
 def estimate_height_cm(frame: np.ndarray) -> float:
     """Estima altura em cm a partir da vegetação detectada no frame.
 
@@ -68,6 +83,7 @@ def estimate_height_cm(frame: np.ndarray) -> float:
 
 
 def _estimate_height_from_segmentation(model, frame: np.ndarray) -> float:
+    frame = _recortar_area_interesse(frame)
     height, width = frame.shape[:2]
     results = model(frame, conf=0.10, verbose=False)
 
@@ -89,6 +105,7 @@ def _estimate_height_from_segmentation(model, frame: np.ndarray) -> float:
 
 
 def _estimate_height_from_green_density(frame: np.ndarray) -> float:
+    frame = _recortar_area_interesse(frame)
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     lower_green = np.array([35, 40, 40])
     upper_green = np.array([85, 255, 255])
@@ -100,7 +117,7 @@ def _estimate_height_from_green_density(frame: np.ndarray) -> float:
 
 
 LIMIAR_CRITICO_CM = 30
-LIMIAR_ALERTA_CM = 20
+LIMIAR_ALERTA_CM = 10
 
 
 def classify_status(height_cm: float) -> tuple[str, str]:

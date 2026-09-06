@@ -4,6 +4,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
+import cv2
+import numpy as np
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -81,12 +83,12 @@ async def process_video(
         conn = db.get_connection()
         cur = conn.execute(
             "INSERT INTO videos (filename, average_height_cm, status, km_inicio, km_fim, nome_trecho, is_exemplo) "
-            "VALUES (?, ?, ?, ?, ?, ?, 0)",
+            "VALUES (%s, %s, %s, %s, %s, %s, 0) RETURNING id",
             (file.filename, average_height_cm, overall_status, km_inicio, km_fim, nome_trecho),
         )
-        video_id = cur.lastrowid
+        video_id = cur.fetchone()["id"]
         conn.executemany(
-            "INSERT INTO readings (video_id, timestamp_s, height_cm, status, color) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO readings (video_id, timestamp_s, height_cm, status, color) VALUES (%s, %s, %s, %s, %s)",
             [(video_id, r["timestamp_s"], r["height_cm"], r["status"], r["color"]) for r in readings],
         )
         conn.commit()
@@ -112,6 +114,54 @@ async def process_video(
             Path(tmp_path).unlink(missing_ok=True)
 
 
+@app.post("/api/analisar-foto")
+async def analisar_foto(
+    file: UploadFile = File(...),
+    km_inicio: Optional[float] = Form(None),
+    km_fim: Optional[float] = Form(None),
+    nome_trecho: Optional[str] = Form(None),
+):
+    """Análise instantânea a partir de uma única foto (não vídeo) — fluxo
+    pensado para o app mobile: tira a foto, manda, recebe o resultado na
+    hora. Reaproveita exatamente a mesma lógica de análise e persistência
+    do /api/process-video (estimate_height_cm/classify_status, tabelas
+    videos/readings), só que com uma leitura única em vez de várias.
+    """
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Envie um arquivo de imagem")
+
+    conteudo = await file.read()
+    array_bytes = np.frombuffer(conteudo, dtype=np.uint8)
+    frame = cv2.imdecode(array_bytes, cv2.IMREAD_COLOR)
+    if frame is None:
+        raise HTTPException(status_code=422, detail="Não foi possível ler a imagem")
+
+    height_cm = estimate_height_cm(frame)
+    status, color = classify_status(height_cm)
+
+    conn = db.get_connection()
+    cur = conn.execute(
+        "INSERT INTO videos (filename, average_height_cm, status, km_inicio, km_fim, nome_trecho, is_exemplo) "
+        "VALUES (%s, %s, %s, %s, %s, %s, 0) RETURNING id",
+        (file.filename, height_cm, status, km_inicio, km_fim, nome_trecho),
+    )
+    video_id = cur.fetchone()["id"]
+    conn.execute(
+        "INSERT INTO readings (video_id, timestamp_s, height_cm, status, color) VALUES (%s, %s, %s, %s, %s)",
+        (video_id, 0, height_cm, status, color),
+    )
+    conn.commit()
+    conn.close()
+
+    return {
+        "sucesso": True,
+        "video_id": video_id,
+        "altura_estimada_cm": height_cm,
+        "status_veroai": status,
+        "recomendacao_cor": color,
+    }
+
+
 def _com_previsao(video: dict) -> dict:
     """Anexa a previsão preventiva (dias/data até cruzar o limiar crítico)."""
     dias = prever_dias_ate_critico(video["average_height_cm"])
@@ -125,9 +175,9 @@ def _com_previsao(video: dict) -> dict:
 @app.get("/api/videos")
 def list_videos(km_ref: Optional[float] = None, raio_km: Optional[float] = None):
     conn = db.get_connection()
-    rows = conn.execute("SELECT * FROM videos ORDER BY created_at DESC").fetchall()
+    rows = conn.execute("SELECT * FROM videos ORDER BY created_at DESC")
+    videos = [_com_previsao(dict(row)) for row in rows.fetchall()]
     conn.close()
-    videos = [_com_previsao(dict(row)) for row in rows]
 
     if km_ref is not None and raio_km is not None:
         videos = [v for v in videos if _distancia_do_ref(v, km_ref) is not None and _distancia_do_ref(v, km_ref) <= raio_km]
@@ -151,16 +201,16 @@ class LocalizacaoUpdate(BaseModel):
 @app.patch("/api/videos/{video_id}/localizacao")
 def set_localizacao(video_id: int, body: LocalizacaoUpdate):
     conn = db.get_connection()
-    video = conn.execute("SELECT id FROM videos WHERE id = ?", (video_id,)).fetchone()
+    video = conn.execute("SELECT id FROM videos WHERE id = %s", (video_id,)).fetchone()
     if not video:
         conn.close()
         raise HTTPException(status_code=404, detail="Vídeo não encontrado")
     conn.execute(
-        "UPDATE videos SET km_inicio = ?, km_fim = ? WHERE id = ?",
+        "UPDATE videos SET km_inicio = %s, km_fim = %s WHERE id = %s",
         (body.km_inicio, body.km_fim, video_id),
     )
     conn.commit()
-    updated = conn.execute("SELECT * FROM videos WHERE id = ?", (video_id,)).fetchone()
+    updated = conn.execute("SELECT * FROM videos WHERE id = %s", (video_id,)).fetchone()
     conn.close()
     return dict(updated)
 
@@ -168,14 +218,14 @@ def set_localizacao(video_id: int, body: LocalizacaoUpdate):
 @app.post("/api/videos/{video_id}/solicitar-rocada")
 def solicitar_rocada(video_id: int):
     conn = db.get_connection()
-    video = conn.execute("SELECT id FROM videos WHERE id = ?", (video_id,)).fetchone()
+    video = conn.execute("SELECT id FROM videos WHERE id = %s", (video_id,)).fetchone()
     if not video:
         conn.close()
         raise HTTPException(status_code=404, detail="Vídeo não encontrado")
     agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    conn.execute("UPDATE videos SET rocada_solicitada_em = ? WHERE id = ?", (agora, video_id))
+    conn.execute("UPDATE videos SET rocada_solicitada_em = %s WHERE id = %s", (agora, video_id))
     conn.commit()
-    updated = conn.execute("SELECT * FROM videos WHERE id = ?", (video_id,)).fetchone()
+    updated = conn.execute("SELECT * FROM videos WHERE id = %s", (video_id,)).fetchone()
     conn.close()
     return _com_previsao(dict(updated))
 
@@ -183,13 +233,13 @@ def solicitar_rocada(video_id: int):
 @app.delete("/api/videos/{video_id}/solicitar-rocada")
 def cancelar_solicitacao_rocada(video_id: int):
     conn = db.get_connection()
-    video = conn.execute("SELECT id FROM videos WHERE id = ?", (video_id,)).fetchone()
+    video = conn.execute("SELECT id FROM videos WHERE id = %s", (video_id,)).fetchone()
     if not video:
         conn.close()
         raise HTTPException(status_code=404, detail="Vídeo não encontrado")
-    conn.execute("UPDATE videos SET rocada_solicitada_em = NULL WHERE id = ?", (video_id,))
+    conn.execute("UPDATE videos SET rocada_solicitada_em = NULL WHERE id = %s", (video_id,))
     conn.commit()
-    updated = conn.execute("SELECT * FROM videos WHERE id = ?", (video_id,)).fetchone()
+    updated = conn.execute("SELECT * FROM videos WHERE id = %s", (video_id,)).fetchone()
     conn.close()
     return _com_previsao(dict(updated))
 
@@ -201,13 +251,13 @@ class AgendamentoUpdate(BaseModel):
 @app.patch("/api/videos/{video_id}/agendar-rocada")
 def agendar_rocada(video_id: int, body: AgendamentoUpdate):
     conn = db.get_connection()
-    video = conn.execute("SELECT id FROM videos WHERE id = ?", (video_id,)).fetchone()
+    video = conn.execute("SELECT id FROM videos WHERE id = %s", (video_id,)).fetchone()
     if not video:
         conn.close()
         raise HTTPException(status_code=404, detail="Vídeo não encontrado")
-    conn.execute("UPDATE videos SET rocada_agendada_para = ? WHERE id = ?", (body.data, video_id))
+    conn.execute("UPDATE videos SET rocada_agendada_para = %s WHERE id = %s", (body.data, video_id))
     conn.commit()
-    updated = conn.execute("SELECT * FROM videos WHERE id = ?", (video_id,)).fetchone()
+    updated = conn.execute("SELECT * FROM videos WHERE id = %s", (video_id,)).fetchone()
     conn.close()
     return _com_previsao(dict(updated))
 
@@ -215,13 +265,13 @@ def agendar_rocada(video_id: int, body: AgendamentoUpdate):
 @app.delete("/api/videos/{video_id}/agendar-rocada")
 def cancelar_agendamento_rocada(video_id: int):
     conn = db.get_connection()
-    video = conn.execute("SELECT id FROM videos WHERE id = ?", (video_id,)).fetchone()
+    video = conn.execute("SELECT id FROM videos WHERE id = %s", (video_id,)).fetchone()
     if not video:
         conn.close()
         raise HTTPException(status_code=404, detail="Vídeo não encontrado")
-    conn.execute("UPDATE videos SET rocada_agendada_para = NULL WHERE id = ?", (video_id,))
+    conn.execute("UPDATE videos SET rocada_agendada_para = NULL WHERE id = %s", (video_id,))
     conn.commit()
-    updated = conn.execute("SELECT * FROM videos WHERE id = ?", (video_id,)).fetchone()
+    updated = conn.execute("SELECT * FROM videos WHERE id = %s", (video_id,)).fetchone()
     conn.close()
     return _com_previsao(dict(updated))
 
@@ -297,6 +347,7 @@ def get_cronograma(max_km_dia: float = 20.0):
                 "dia": dia,
                 "distancia_anterior_km": distancia_anterior_km,
                 "rocada_solicitada_em": v["rocada_solicitada_em"],
+                "rocada_agendada_para": v["rocada_agendada_para"],
                 "previsao_dias_ate_critico": v["previsao_dias_ate_critico"],
                 "previsao_data_critico": v["previsao_data_critico"],
             }
@@ -307,13 +358,112 @@ def get_cronograma(max_km_dia: float = 20.0):
     return {"max_km_dia": max_km_dia, "total_dias": dia, "cronograma": cronograma}
 
 
+@app.get("/api/usuarios")
+def listar_usuarios(papel: Optional[str] = None):
+    """Contas de demonstração (login mockado, sem senha) — 'gestor' e
+    'encarregado'. Semeadas automaticamente em init_db(); não é uma
+    integração real com o RH da Motiva."""
+    conn = db.get_connection()
+    if papel is not None:
+        rows = conn.execute("SELECT * FROM usuarios WHERE papel = %s ORDER BY id", (papel,)).fetchall()
+    else:
+        rows = conn.execute("SELECT * FROM usuarios ORDER BY id").fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+class MensagemCreate(BaseModel):
+    video_id: int
+    destinatario: str
+    cargo: Optional[str] = None
+    mensagem: str
+    remetente: str  # nome do usuário logado que está enviando ("gestor" ou "encarregado")
+    tipo: str = "texto"  # "texto" ou "solicitacao"
+    data_solicitada: Optional[str] = None  # YYYY-MM-DD, só para tipo="solicitacao"
+
+
+@app.post("/api/mensagens")
+def enviar_mensagem(body: MensagemCreate):
+    conn = db.get_connection()
+    try:
+        video = conn.execute("SELECT * FROM videos WHERE id = %s", (body.video_id,)).fetchone()
+        if not video:
+            raise HTTPException(status_code=404, detail="Vídeo não encontrado")
+        video = dict(video)
+
+        # pg_advisory_xact_lock toma um lock nomeado (hash de video_id +
+        # destinatario) já aqui, antes da checagem de duplicata. Sem isso,
+        # duas requisições verdadeiramente simultâneas (duas abas, por
+        # exemplo) podiam fazer o SELECT ao mesmo tempo, as duas veriam "não
+        # existe" (porque nenhuma tinha commitado ainda) e as duas inseriam —
+        # a segunda requisição agora espera aqui até a primeira terminar (o
+        # lock é liberado sozinho no commit/rollback da transação), e só
+        # então enxerga o que a primeira já criou.
+        conn.execute(
+            "SELECT pg_advisory_xact_lock(hashtext(%s))",
+            (f"{body.video_id}:{body.destinatario}",),
+        )
+
+        # Trava contra envio duplicado no servidor (cobre duas abas/dispositivos
+        # mandando quase ao mesmo tempo — uma trava só no navegador não vê a
+        # outra aba). Se a mesma mensagem exata já foi criada nos últimos 5s,
+        # devolve o registro existente em vez de criar outro.
+        janela_dedupe = (datetime.now() - timedelta(seconds=5)).strftime("%Y-%m-%d %H:%M:%S")
+        existente = conn.execute(
+            "SELECT * FROM mensagens WHERE video_id = %s AND destinatario = %s AND mensagem = %s AND tipo = %s "
+            "AND remetente = %s AND enviada_em >= %s ORDER BY id DESC LIMIT 1",
+            (body.video_id, body.destinatario, body.mensagem, body.tipo, body.remetente, janela_dedupe),
+        ).fetchone()
+        if existente:
+            existente = dict(existente)
+            conn.commit()  # encerra a transação (nada foi alterado, mas libera o lock)
+            return {"mensagem": existente}
+
+        # Define enviada_em explicitamente (em vez de deixar o banco decidir)
+        # para usar o mesmo relógio da resposta automática abaixo — misturar
+        # relógios diferentes bagunçava a ordem da conversa.
+        agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cur = conn.execute(
+            "INSERT INTO mensagens (video_id, destinatario, cargo, mensagem, remetente, tipo, data_solicitada, enviada_em) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+            (body.video_id, body.destinatario, body.cargo, body.mensagem, body.remetente, body.tipo, body.data_solicitada, agora),
+        )
+        mensagem_id = cur.fetchone()["id"]
+        criada = dict(conn.execute("SELECT * FROM mensagens WHERE id = %s", (mensagem_id,)).fetchone())
+
+        conn.commit()
+        return {"mensagem": criada}
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@app.get("/api/mensagens")
+def listar_mensagens(video_id: Optional[int] = None, destinatario: Optional[str] = None):
+    conn = db.get_connection()
+    query = "SELECT * FROM mensagens WHERE 1=1"
+    params: list = []
+    if video_id is not None:
+        query += " AND video_id = %s"
+        params.append(video_id)
+    if destinatario is not None:
+        query += " AND destinatario = %s"
+        params.append(destinatario)
+    query += " ORDER BY enviada_em ASC"
+    rows = conn.execute(query, params).fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
 @app.get("/api/videos/{video_id}/readings")
 def get_readings(video_id: int):
     conn = db.get_connection()
-    video = conn.execute("SELECT * FROM videos WHERE id = ?", (video_id,)).fetchone()
+    video = conn.execute("SELECT * FROM videos WHERE id = %s", (video_id,)).fetchone()
     if not video:
         conn.close()
         raise HTTPException(status_code=404, detail="Vídeo não encontrado")
-    rows = conn.execute("SELECT * FROM readings WHERE video_id = ? ORDER BY timestamp_s", (video_id,)).fetchall()
+    rows = conn.execute("SELECT * FROM readings WHERE video_id = %s ORDER BY timestamp_s", (video_id,)).fetchall()
     conn.close()
     return {"video": dict(video), "readings": [dict(row) for row in rows]}

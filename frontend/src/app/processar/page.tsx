@@ -7,6 +7,7 @@ import {
   kmDaLeitura,
   notificarDadosAtualizados,
   statusBar,
+  statusLabel,
   statusStyle,
   type ProcessResult,
 } from "@/lib/api";
@@ -213,7 +214,7 @@ export default function ProcessarPage() {
               className={`rounded-xl border p-5 ${statusStyle(result.status)}`}
             >
               <p className="text-sm opacity-70">Status do trecho</p>
-              <p className="mt-1 text-3xl font-bold">{result.status}</p>
+              <p className="mt-1 text-3xl font-bold">{statusLabel(result.status)}</p>
             </div>
             <div className="rounded-xl border border-border-soft bg-white p-5 dark:border-white/15 dark:bg-white/5">
               <p className="text-sm text-muted">Frames analisados</p>

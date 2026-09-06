@@ -10,6 +10,11 @@ processado pelo modelo. Rodar de novo sempre que quiser resetar a demo.
 
 Cada exemplo simula um vídeo de DURACAO_S segundos cobrindo o km_inicio–km_fim
 inteiro, com uma leitura a cada 2s (mesmo intervalo do pipeline real).
+
+Os trechos usam rodovias reais administradas pela Motiva Autoban — Anhanguera
+(SP-330, km 11,460 a 158,500) e Bandeirantes (SP-348, km 13,360 a 173,032) —
+para a demonstração soar próxima da operação real. As leituras de altura em
+si continuam sendo geradas (não são medições de campo).
 """
 
 import random
@@ -26,34 +31,34 @@ INTERVALO_S = 2.0
 
 EXEMPLOS = [
     {
-        "nome_trecho": "Km 12 a 14 — BR-101 Norte",
-        "filename": "exemplo_km12_14.mp4",
-        "km_inicio": 12.0,
-        "km_fim": 14.0,
+        "nome_trecho": "SP-330 (Anhanguera) — Km 45 a 47",
+        "filename": "exemplo_sp330_km45_47.mp4",
+        "km_inicio": 45.0,
+        "km_fim": 47.0,
         "media_alvo": 31.0,
         "amplitude": 3.0,
     },
     {
-        "nome_trecho": "Km 30 a 31 — Acesso Industrial",
-        "filename": "exemplo_km30_31.mp4",
-        "km_inicio": 30.0,
-        "km_fim": 31.0,
+        "nome_trecho": "SP-330 (Anhanguera) — Km 96 a 97",
+        "filename": "exemplo_sp330_km96_97.mp4",
+        "km_inicio": 96.0,
+        "km_fim": 97.0,
         "media_alvo": 21.5,
         "amplitude": 2.5,
     },
     {
-        "nome_trecho": "Km 50 a 51 — Trevo Sul",
-        "filename": "exemplo_km50_51.mp4",
-        "km_inicio": 50.0,
-        "km_fim": 51.0,
+        "nome_trecho": "SP-348 (Bandeirantes) — Km 60 a 61",
+        "filename": "exemplo_sp348_km60_61.mp4",
+        "km_inicio": 60.0,
+        "km_fim": 61.0,
         "media_alvo": 6.8,
         "amplitude": 2.0,
     },
     {
-        "nome_trecho": "Km 65 a 67 — Curva do Mirante",
-        "filename": "exemplo_km65_67.mp4",
-        "km_inicio": 65.0,
-        "km_fim": 67.0,
+        "nome_trecho": "SP-348 (Bandeirantes) — Km 132 a 134",
+        "filename": "exemplo_sp348_km132_134.mp4",
+        "km_inicio": 132.0,
+        "km_fim": 134.0,
         "media_alvo": 17.0,
         "amplitude": 2.5,
     },
@@ -74,9 +79,9 @@ def gerar_leituras_cm(media_alvo: float, amplitude: float, seed: int) -> list[fl
 
 
 def clear_exemplos(conn):
-    ids = [row["id"] for row in conn.execute("SELECT id FROM videos WHERE is_exemplo = 1")]
+    ids = [row["id"] for row in conn.execute("SELECT id FROM videos WHERE is_exemplo = 1").fetchall()]
     if ids:
-        placeholders = ",".join("?" for _ in ids)
+        placeholders = ",".join("%s" for _ in ids)
         conn.execute(f"DELETE FROM readings WHERE video_id IN ({placeholders})", ids)
         conn.execute(f"DELETE FROM videos WHERE id IN ({placeholders})", ids)
     conn.commit()
@@ -99,7 +104,7 @@ def seed(conn):
 
         cur = conn.execute(
             "INSERT INTO videos (filename, average_height_cm, status, km_inicio, km_fim, nome_trecho, is_exemplo) "
-            "VALUES (?, ?, ?, ?, ?, ?, 1)",
+            "VALUES (%s, %s, %s, %s, %s, %s, 1) RETURNING id",
             (
                 exemplo["filename"],
                 average_height_cm,
@@ -109,9 +114,9 @@ def seed(conn):
                 exemplo["nome_trecho"],
             ),
         )
-        video_id = cur.lastrowid
+        video_id = cur.fetchone()["id"]
         conn.executemany(
-            "INSERT INTO readings (video_id, timestamp_s, height_cm, status, color) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO readings (video_id, timestamp_s, height_cm, status, color) VALUES (%s, %s, %s, %s, %s)",
             [(video_id, r["timestamp_s"], r["height_cm"], r["status"], r["color"]) for r in readings],
         )
     conn.commit()

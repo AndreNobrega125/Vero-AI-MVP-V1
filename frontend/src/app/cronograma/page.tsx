@@ -6,6 +6,7 @@ import {
   formatarDataBR,
   notificarDadosAtualizados,
   ouvirDadosAtualizados,
+  statusLabel,
   statusStyle,
   textoPrevisao,
   type CronogramaItem,
@@ -22,15 +23,21 @@ export default function CronogramaPage() {
   const [buscandoHorarioId, setBuscandoHorarioId] = useState<number | null>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
-  function load() {
-    setLoading(true);
-    setError(null);
-    fetch(`${API_URL}/api/cronograma?max_km_dia=${maxKmDia}`)
+  // Busca silenciosa: não mexe em `loading`, então o polling não esconde
+  // o cronograma atrás de "Carregando…" a cada rodada.
+  function buscarCronograma() {
+    return fetch(`${API_URL}/api/cronograma?max_km_dia=${maxKmDia}`)
       .then((res) => {
         if (!res.ok) throw new Error(`Erro ${res.status}`);
         return res.json();
       })
-      .then(setData)
+      .then(setData);
+  }
+
+  function load() {
+    setLoading(true);
+    setError(null);
+    buscarCronograma()
       .catch(() =>
         setError("Não foi possível carregar o cronograma. A API está rodando?"),
       )
@@ -43,9 +50,22 @@ export default function CronogramaPage() {
   }, []);
 
   useEffect(() => {
-    return ouvirDadosAtualizados(load);
+    return ouvirDadosAtualizados(() => buscarCronograma().catch(() => {}));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Polling: um trecho processado ou uma roçada solicitada em outro
+  // aparelho não avisa esta aba sozinha (BroadcastChannel só sincroniza
+  // abas do mesmo navegador) — sem isso, só atualizaria com refresh manual.
+  useEffect(() => {
+    const intervalo = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        buscarCronograma().catch(() => {});
+      }
+    }, 4000);
+    return () => clearInterval(intervalo);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [maxKmDia]);
 
   function atualizarItem(videoId: number, patch: Partial<CronogramaItem>) {
     setData((prev) =>
@@ -229,7 +249,7 @@ export default function CronogramaPage() {
                           <span
                             className={`rounded-full border px-2.5 py-1 text-xs font-medium ${statusStyle(item.status)}`}
                           >
-                            {item.status}
+                            {statusLabel(item.status)}
                           </span>
                           {temAcao ? (
                             <span className="whitespace-nowrap rounded-full border border-positive/30 bg-positive/10 px-2.5 py-1 text-xs font-medium text-positive">
