@@ -1,3 +1,4 @@
+import logging
 import shutil
 import tempfile
 from datetime import datetime, timedelta
@@ -28,7 +29,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-db.init_db()
+try:
+    db.init_db()
+except Exception:
+    # Uma falha momentanea de conexao com o Supabase no startup nao deve
+    # derrubar o container inteiro (isso vira crash-loop e 502 constante).
+    # /api/health continua respondendo; os demais endpoints falham por
+    # request individualmente (get_connection() ja levanta erro claro)
+    # ate o banco voltar.
+    logging.exception("Falha ao inicializar o banco no startup")
 
 VIDEOS_DIR = Path(__file__).resolve().parent.parent / "data" / "videos"
 
