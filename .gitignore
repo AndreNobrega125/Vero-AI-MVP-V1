@@ -21,8 +21,14 @@ backend/data/videos/
 .env.*
 *.pem
 
-# Modelos treinados (pesos grandes — distribuir fora do repo)
+# Modelos treinados (pesos grandes — distribuir fora do repo por padrão).
+# Exceção: backend/app/models/best.pt é versionado propositalmente — é o
+# arquivo que o Railway empacota na imagem Docker pra rodar a inferência
+# real. Pequeno o suficiente (modelo nano/small do YOLOv8-Seg) pra não
+# estourar o limite do GitHub (100MB). Se um dia o modelo real for maior
+# que isso, essa exceção precisa ser revista (Git LFS ou download externo).
 *.pt
+!backend/app/models/best.pt
 
 # Sistema
 .DS_Store
