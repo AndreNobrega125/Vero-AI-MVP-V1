@@ -20,6 +20,18 @@ export type ProcessResult = {
   readings: Reading[];
 };
 
+export type FotoResult = {
+  sucesso: boolean;
+  video_id: number;
+  altura_estimada_cm: number;
+  status_veroai: string;
+  recomendacao_cor: string;
+  fonte?: "mirella_api" | "estimativa_local";
+  rotulo?: string | null;
+  motivo?: string | null;
+  imagem_anotada_base64?: string | null;
+};
+
 export type VideoRow = {
   id: number;
   filename: string;

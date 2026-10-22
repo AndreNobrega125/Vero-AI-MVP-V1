@@ -4,5 +4,7 @@ python-multipart
 opencv-python
 numpy
 ultralytics
+roboflow
+requests
 psycopg2-binary
 python-dotenv

@@ -17,6 +17,8 @@ from .analysis import (
     estimate_height_cm,
     classify_status,
     prever_dias_ate_critico,
+    analisar_foto_com_regua,
+    ErroAnaliseFoto,
     STATUS_PRIORITY,
 )
 
@@ -129,24 +131,48 @@ async def analisar_foto(
     km_inicio: Optional[float] = Form(None),
     km_fim: Optional[float] = Form(None),
     nome_trecho: Optional[str] = Form(None),
+    lat: Optional[float] = Form(None),
+    lon: Optional[float] = Form(None),
 ):
     """Análise instantânea a partir de uma única foto (não vídeo) — fluxo
     pensado para o app mobile: tira a foto, manda, recebe o resultado na
-    hora. Reaproveita exatamente a mesma lógica de análise e persistência
-    do /api/process-video (estimate_height_cm/classify_status, tabelas
-    videos/readings), só que com uma leitura única em vez de várias.
+    hora.
+
+    Tenta primeiro a API da Mirella (MIRELLA_API_URL configurada — mede por
+    régua física na cena, mais precisa). Se não estiver configurada ou
+    estiver fora do ar, cai no fallback estimate_height_cm (mesma lógica do
+    /api/process-video). Nos dois casos, salva em videos/readings com uma
+    leitura única.
     """
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="Envie um arquivo de imagem")
 
     conteudo = await file.read()
-    array_bytes = np.frombuffer(conteudo, dtype=np.uint8)
-    frame = cv2.imdecode(array_bytes, cv2.IMREAD_COLOR)
-    if frame is None:
-        raise HTTPException(status_code=422, detail="Não foi possível ler a imagem")
 
-    height_cm = estimate_height_cm(frame)
-    status, color = classify_status(height_cm)
+    extras: dict = {}
+    try:
+        resultado_mirella = analisar_foto_com_regua(conteudo, file.filename, lat, lon)
+    except ErroAnaliseFoto as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+    if resultado_mirella is not None:
+        height_cm = resultado_mirella["height_cm"]
+        status = resultado_mirella["status"]
+        color = resultado_mirella["color"]
+        extras = {
+            "rotulo": resultado_mirella.get("rotulo"),
+            "motivo": resultado_mirella.get("motivo"),
+            "imagem_anotada_base64": resultado_mirella.get("imagem_anotada_base64"),
+            "fonte": "mirella_api",
+        }
+    else:
+        array_bytes = np.frombuffer(conteudo, dtype=np.uint8)
+        frame = cv2.imdecode(array_bytes, cv2.IMREAD_COLOR)
+        if frame is None:
+            raise HTTPException(status_code=422, detail="Não foi possível ler a imagem")
+        height_cm = estimate_height_cm(frame)
+        status, color = classify_status(height_cm)
+        extras = {"fonte": "estimativa_local"}
 
     conn = db.get_connection()
     cur = conn.execute(
@@ -168,6 +194,7 @@ async def analisar_foto(
         "altura_estimada_cm": height_cm,
         "status_veroai": status,
         "recomendacao_cor": color,
+        **extras,
     }
 
 
@@ -408,10 +435,11 @@ def enviar_mensagem(body: MensagemCreate):
         # a segunda requisição agora espera aqui até a primeira terminar (o
         # lock é liberado sozinho no commit/rollback da transação), e só
         # então enxerga o que a primeira já criou.
-        conn.execute(
-            "SELECT pg_advisory_xact_lock(hashtext(%s))",
-            (f"{body.video_id}:{body.destinatario}",),
-        )
+        if not db.USE_SQLITE:  # SQLite local (1 usuário) não tem nem precisa do lock
+            conn.execute(
+                "SELECT pg_advisory_xact_lock(hashtext(%s))",
+                (f"{body.video_id}:{body.destinatario}",),
+            )
 
         # Trava contra envio duplicado no servidor (cobre duas abas/dispositivos
         # mandando quase ao mesmo tempo — uma trava só no navegador não vê a

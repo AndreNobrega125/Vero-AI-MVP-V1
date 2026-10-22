@@ -33,9 +33,38 @@ frontend/   Site Next.js — identificação da equipe, teste do protótipo, das
 | `/processar` | Upload do vídeo, processamento e resultado da análise |
 | `/dashboard` | Plataforma de dados: KPIs, filtros e histórico por trecho |
 
-## Como rodar
+## Como rodar (localhost, sem nuvem)
 
-### Backend
+Requisitos: **Python 3.10+** e **Node.js 20+ (LTS)**, ambos no PATH. No Windows,
+dê dois cliques em `iniciar-local.bat` na raiz do projeto. Ele cria o ambiente,
+instala as dependências, cria o banco local com dados de exemplo, sobe a API
+(`http://localhost:8000`) e o site (`http://localhost:3000`) e abre o navegador.
+
+Sem `DATABASE_URL`, o backend usa **SQLite** em `backend/data/veroai.db` (não
+precisa de Supabase). Sem `ultralytics`, a estimativa de altura usa a análise
+por cor (HSV). Login é simulado, sem senha. Para zerar os dados, feche tudo e
+apague `backend/data/veroai.db`.
+
+Para rodar manualmente (qualquer sistema), em dois terminais:
+
+```bash
+# Terminal 1 — API
+cd backend
+python -m venv venv
+venv/Scripts/python.exe -m pip install -r requirements-local.txt   # Linux/Mac: venv/bin/python
+venv/Scripts/python.exe scripts/seed_exemplos.py
+venv/Scripts/python.exe scripts/seed_mensagens.py
+venv/Scripts/python.exe -m uvicorn app.main:app --port 8000
+
+# Terminal 2 — Site
+cd frontend
+npm install
+npm run dev
+```
+
+`requirements.txt` (completo, com YOLO/Supabase) é só para o deploy no Railway.
+
+### Backend (modo completo)
 
 ```bash
 cd backend

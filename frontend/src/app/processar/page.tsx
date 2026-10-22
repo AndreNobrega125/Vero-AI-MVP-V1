@@ -9,6 +9,7 @@ import {
   statusBar,
   statusLabel,
   statusStyle,
+  type FotoResult,
   type ProcessResult,
 } from "@/lib/api";
 
@@ -17,14 +18,19 @@ export default function ProcessarPage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<ProcessResult | null>(null);
+  const [resultVideo, setResultVideo] = useState<ProcessResult | null>(null);
+  const [resultFoto, setResultFoto] = useState<FotoResult | null>(null);
   const [kmInicio, setKmInicio] = useState("");
   const [kmFim, setKmFim] = useState("");
   const [nomeTrecho, setNomeTrecho] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const ehFoto = file?.type.startsWith("image/") ?? false;
+  const result = resultVideo ?? resultFoto;
+
   function handleSelect(selected: File | null) {
-    setResult(null);
+    setResultVideo(null);
+    setResultFoto(null);
     setError(null);
     setFile(selected);
     if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -35,7 +41,8 @@ export default function ProcessarPage() {
     if (!file) return;
     setLoading(true);
     setError(null);
-    setResult(null);
+    setResultVideo(null);
+    setResultFoto(null);
 
     try {
       const formData = new FormData();
@@ -43,7 +50,9 @@ export default function ProcessarPage() {
       if (kmInicio !== "") formData.append("km_inicio", kmInicio);
       if (kmFim !== "") formData.append("km_fim", kmFim);
       if (nomeTrecho !== "") formData.append("nome_trecho", nomeTrecho);
-      const res = await fetch(`${API_URL}/api/process-video`, {
+
+      const endpoint = ehFoto ? "/api/analisar-foto" : "/api/process-video";
+      const res = await fetch(`${API_URL}${endpoint}`, {
         method: "POST",
         body: formData,
       });
@@ -51,21 +60,25 @@ export default function ProcessarPage() {
         const detail = await res.json().catch(() => null);
         throw new Error(detail?.detail ?? `Erro ${res.status}`);
       }
-      setResult((await res.json()) as ProcessResult);
+      if (ehFoto) {
+        setResultFoto((await res.json()) as FotoResult);
+      } else {
+        setResultVideo((await res.json()) as ProcessResult);
+      }
       notificarDadosAtualizados();
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : "Não foi possível processar o vídeo. A API está rodando?",
+          : `Não foi possível processar o ${ehFoto ? "foto" : "vídeo"}. A API está rodando?`,
       );
     } finally {
       setLoading(false);
     }
   }
 
-  const maxHeight = result
-    ? Math.max(...result.readings.map((r) => r.height_cm), 1)
+  const maxHeight = resultVideo
+    ? Math.max(...resultVideo.readings.map((r) => r.height_cm), 1)
     : 1;
 
   return (
@@ -77,16 +90,16 @@ export default function ProcessarPage() {
         Análise de vegetação
       </h1>
       <p className="mt-2 text-muted">
-        Envie um vídeo gravado na rodovia. O sistema extrai um frame a cada 2
-        segundos, estima a altura da vegetação em cada frame e calcula a média
-        do trecho.
+        Envie um vídeo gravado na rodovia (extrai um frame a cada 2 segundos e
+        calcula a média do trecho) ou uma foto avulsa com a régua de
+        referência (análise instantânea, uma leitura só).
       </p>
 
       <div className="mt-8 rounded-2xl border border-border-soft bg-white p-6 shadow-sm dark:border-white/15 dark:bg-white/5">
         <input
           ref={inputRef}
           type="file"
-          accept="video/*"
+          accept="video/*,image/*"
           className="hidden"
           onChange={(e) => handleSelect(e.target.files?.[0] ?? null)}
         />
@@ -95,14 +108,22 @@ export default function ProcessarPage() {
             onClick={() => inputRef.current?.click()}
             className="rounded-lg border border-motiva/30 px-4 py-2 text-sm font-medium text-motiva-dark hover:bg-focus-light dark:border-white/20 dark:text-white dark:hover:bg-white/10"
           >
-            Escolher vídeo
+            Escolher vídeo ou foto
           </button>
           <span className="text-sm text-muted">
             {file ? file.name : "Nenhum arquivo selecionado"}
           </span>
         </div>
 
-        {previewUrl && (
+        {previewUrl && ehFoto && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={previewUrl}
+            alt="Prévia da foto selecionada"
+            className="mt-4 max-h-80 w-full rounded-lg border border-border-soft object-contain dark:border-white/15"
+          />
+        )}
+        {previewUrl && !ehFoto && (
           <video
             src={previewUrl}
             controls
@@ -168,7 +189,7 @@ export default function ProcessarPage() {
           }
           className="mt-4 rounded-lg bg-motiva px-5 py-2.5 text-sm font-medium text-white transition hover:bg-motiva-dark disabled:opacity-40"
         >
-          {loading ? "Processando…" : "Analisar vegetação"}
+          {loading ? "Processando…" : ehFoto ? "Analisar foto" : "Analisar vegetação"}
         </button>
 
         {error && (
@@ -182,10 +203,12 @@ export default function ProcessarPage() {
         <section className="mt-10">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-xl font-semibold text-motiva-dark dark:text-white">
-              {result.nome_trecho || "Resultado da análise"}
-              {result.km_inicio !== null && result.km_fim !== null && (
+              {resultVideo
+                ? resultVideo.nome_trecho || "Resultado da análise"
+                : nomeTrecho || "Resultado da análise"}
+              {resultVideo?.km_inicio !== null && resultVideo?.km_fim != null && resultVideo && (
                 <span className="ml-2 text-sm font-normal text-muted">
-                  · km {result.km_inicio} – {result.km_fim}
+                  · km {resultVideo.km_inicio} – {resultVideo.km_fim}
                 </span>
               )}
             </h2>
@@ -198,69 +221,114 @@ export default function ProcessarPage() {
               }}
               className="text-sm font-medium text-motiva underline underline-offset-4"
             >
-              Analisar outro vídeo
+              Analisar outro {ehFoto ? "arquivo" : "vídeo"}
             </button>
           </div>
 
-          <div className="mt-4 grid gap-4 sm:grid-cols-3">
-            <div className="rounded-xl border border-border-soft bg-white p-5 dark:border-white/15 dark:bg-white/5">
-              <p className="text-sm text-muted">Altura média</p>
-              <p className="mt-1 text-3xl font-bold text-motiva-dark dark:text-white">
-                {result.average_height_cm}
-                <span className="ml-1 text-lg font-normal text-muted">cm</span>
-              </p>
-            </div>
-            <div
-              className={`rounded-xl border p-5 ${statusStyle(result.status)}`}
-            >
-              <p className="text-sm opacity-70">Status do trecho</p>
-              <p className="mt-1 text-3xl font-bold">{statusLabel(result.status)}</p>
-            </div>
-            <div className="rounded-xl border border-border-soft bg-white p-5 dark:border-white/15 dark:bg-white/5">
-              <p className="text-sm text-muted">Frames analisados</p>
-              <p className="mt-1 text-3xl font-bold text-motiva-dark dark:text-white">
-                {result.readings.length}
-              </p>
-            </div>
-          </div>
+          {resultFoto && (
+            <>
+              {resultFoto.fonte === "mirella_api" && (
+                <p className="mt-2 inline-block rounded-full border border-motiva/30 bg-motiva/10 px-3 py-1 text-xs font-medium text-motiva-dark dark:text-white">
+                  Analisado pelo modelo com medição por régua
+                </p>
+              )}
 
-          <div className="mt-8 flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-muted">
-              Leituras ao longo do trecho
-            </h3>
-            <span className="text-xs text-muted">
-              Duração assumida: {DURACAO_ASSUMIDA_S}s · captura a cada 2s
-            </span>
-          </div>
-          <div className="mt-3 space-y-1.5">
-            {result.readings.map((reading) => {
-              const km = kmDaLeitura(reading.timestamp_s, result.km_inicio, result.km_fim);
-              return (
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 <div
-                  key={reading.timestamp_s}
-                  className="flex items-center gap-3 text-sm"
+                  className={`rounded-xl border p-5 ${statusStyle(resultFoto.status_veroai)}`}
                 >
-                  <span className="w-14 shrink-0 tabular-nums text-muted">
-                    {reading.timestamp_s}s
-                  </span>
-                  <span className="w-16 shrink-0 tabular-nums text-muted">
-                    {km !== null ? `km ${km}` : "—"}
-                  </span>
-                  <div className="h-5 flex-1 overflow-hidden rounded bg-focus-light dark:bg-white/10">
-                    <div
-                      className={`h-full rounded ${statusBar(reading.status)}`}
-                      style={{
-                        width: `${(reading.height_cm / maxHeight) * 100}%`,
-                      }}
-                    />
-                  </div>
-                  <span className="w-20 shrink-0 text-right tabular-nums">
-                    {reading.height_cm} cm
-                  </span>
+                  <p className="text-sm opacity-70">Status do trecho</p>
+                  <p className="mt-1 text-3xl font-bold">
+                    {resultFoto.rotulo ?? statusLabel(resultFoto.status_veroai)}
+                  </p>
                 </div>
-              );
-            })}
-          </div>
+                <div className="rounded-xl border border-border-soft bg-white p-5 dark:border-white/15 dark:bg-white/5">
+                  <p className="text-sm text-muted">Altura estimada</p>
+                  <p className="mt-1 text-3xl font-bold text-motiva-dark dark:text-white">
+                    {resultFoto.altura_estimada_cm}
+                    <span className="ml-1 text-lg font-normal text-muted">cm</span>
+                  </p>
+                </div>
+              </div>
+
+              {resultFoto.motivo && (
+                <p className="mt-3 text-sm text-muted">{resultFoto.motivo}</p>
+              )}
+
+              {resultFoto.imagem_anotada_base64 && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={resultFoto.imagem_anotada_base64}
+                  alt="Imagem anotada pela análise"
+                  className="mt-4 w-full rounded-lg border border-border-soft dark:border-white/15"
+                />
+              )}
+            </>
+          )}
+
+          {resultVideo && (
+            <>
+              <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                <div className="rounded-xl border border-border-soft bg-white p-5 dark:border-white/15 dark:bg-white/5">
+                  <p className="text-sm text-muted">Altura média</p>
+                  <p className="mt-1 text-3xl font-bold text-motiva-dark dark:text-white">
+                    {resultVideo.average_height_cm}
+                    <span className="ml-1 text-lg font-normal text-muted">cm</span>
+                  </p>
+                </div>
+                <div
+                  className={`rounded-xl border p-5 ${statusStyle(resultVideo.status)}`}
+                >
+                  <p className="text-sm opacity-70">Status do trecho</p>
+                  <p className="mt-1 text-3xl font-bold">{statusLabel(resultVideo.status)}</p>
+                </div>
+                <div className="rounded-xl border border-border-soft bg-white p-5 dark:border-white/15 dark:bg-white/5">
+                  <p className="text-sm text-muted">Frames analisados</p>
+                  <p className="mt-1 text-3xl font-bold text-motiva-dark dark:text-white">
+                    {resultVideo.readings.length}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-8 flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-muted">
+                  Leituras ao longo do trecho
+                </h3>
+                <span className="text-xs text-muted">
+                  Duração assumida: {DURACAO_ASSUMIDA_S}s · captura a cada 2s
+                </span>
+              </div>
+              <div className="mt-3 space-y-1.5">
+                {resultVideo.readings.map((reading) => {
+                  const km = kmDaLeitura(reading.timestamp_s, resultVideo.km_inicio, resultVideo.km_fim);
+                  return (
+                    <div
+                      key={reading.timestamp_s}
+                      className="flex items-center gap-3 text-sm"
+                    >
+                      <span className="w-14 shrink-0 tabular-nums text-muted">
+                        {reading.timestamp_s}s
+                      </span>
+                      <span className="w-16 shrink-0 tabular-nums text-muted">
+                        {km !== null ? `km ${km}` : "—"}
+                      </span>
+                      <div className="h-5 flex-1 overflow-hidden rounded bg-focus-light dark:bg-white/10">
+                        <div
+                          className={`h-full rounded ${statusBar(reading.status)}`}
+                          style={{
+                            width: `${(reading.height_cm / maxHeight) * 100}%`,
+                          }}
+                        />
+                      </div>
+                      <span className="w-20 shrink-0 text-right tabular-nums">
+                        {reading.height_cm} cm
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
 
           <p className="mt-6 text-sm text-muted">
             Resultado salvo na plataforma. Veja o histórico no{" "}

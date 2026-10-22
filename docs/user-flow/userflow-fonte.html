@@ -1,0 +1,584 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>User Flow VeroAI</title>
+<style>
+  @page { size: A4 landscape; margin: 0; }
+  @page port { size: A4 portrait; margin: 0; }
+  .page.portrait { width: 210mm; height: 297mm; page: port; }
+  .page.portrait header { flex-direction: column; gap: 6px; }
+  .page.portrait .desc { max-width: none; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #fff; color: #1b2433;
+    font-family: "Segoe UI", system-ui, Arial, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .page { width: 297mm; height: 210mm; padding: 11mm 14mm 9mm; display: flex; flex-direction: column;
+    page-break-after: always; break-after: page; overflow: hidden; position: relative; }
+  .page:last-child { page-break-after: auto; break-after: auto; }
+  .topbar { position: absolute; top: 0; left: 0; right: 0; height: 5px; background: #1f6fd1; }
+  header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 4mm; }
+  .tag { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+    padding: 3px 9px; border-radius: 999px; margin-bottom: 5px; }
+  .tag.gestor { background: #dbe9fb; color: #1b4f93; }
+  .tag.enc { background: #fde7cc; color: #8a4b00; }
+  .tag.comum { background: #e4e7ec; color: #3b4556; }
+  h1 { font-size: 25px; margin: 0; line-height: 1.15; }
+  h1 small { font-weight: 400; color: #5a6475; font-size: 15px; display: block; margin-top: 3px; }
+  .desc { max-width: 92mm; font-size: 11px; line-height: 1.45; color: #3b4556; background: #eef4fc;
+    border: 1px solid #cfdff4; border-radius: 8px; padding: 7px 10px; }
+  .diagram { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+  footer { display: flex; justify-content: space-between; align-items: center; margin-top: 3mm;
+    font-size: 10px; color: #6a7384; border-top: 1px solid #e3e7ee; padding-top: 2.5mm; }
+  .legend { display: flex; gap: 16px; align-items: center; }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .legend svg { display: block; }
+  pre.mermaid { visibility: hidden; margin: 0; }
+  .diagram svg { visibility: visible; }
+  .diagram svg.hand { width: 100%; height: 100%; }
+
+  /* capa */
+  .cover h1 { font-size: 38px; }
+  .cover .grid { display: grid; grid-template-columns: 1.05fr 1fr; gap: 10mm; margin-top: 7mm; flex: 1; }
+  .card { border: 1px solid #dfe5ee; border-radius: 10px; padding: 12px 15px; }
+  .card h2 { font-size: 15px; margin: 0 0 8px; }
+  .card p, .card li { font-size: 12px; line-height: 1.5; color: #333d4d; }
+  .card ul { margin: 4px 0 0; padding-left: 17px; }
+  .profile { border-left: 5px solid; }
+  .profile.gestor { border-left-color: #1f6fd1; }
+  .profile.enc { border-left-color: #e08a1e; }
+  table.team { border-collapse: collapse; width: 100%; font-size: 11.5px; }
+  table.team td, table.team th { text-align: left; padding: 3.5px 6px; border-bottom: 1px solid #eceff4; }
+  table.team th { color: #6a7384; font-weight: 600; }
+  .index { columns: 2; font-size: 11.5px; line-height: 1.7; padding-left: 17px; margin: 0; }
+  .legend-big { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; font-size: 12px; }
+  .legend-big span { display: flex; align-items: center; gap: 8px; }
+</style>
+</head>
+<body>
+
+<!-- ============ CAPA ============ -->
+<section class="page cover">
+  <div class="topbar"></div>
+  <p class="tag comum">Challenge Motiva · Atividade User Flow</p>
+  <h1>User Flow da Plataforma VeroAI
+    <small>Estimativa da altura da vegetação às margens de rodovias com visão computacional, para priorizar a roçada nos trechos críticos</small></h1>
+
+  <div class="grid">
+    <div style="display:flex;flex-direction:column;gap:5mm">
+      <div class="card profile gestor">
+        <h2>Perfil A — Gestor de conservação</h2>
+        <p>Responsável pela rodovia. Envia vídeos/fotos para análise, acompanha os indicadores e decide onde e quando roçar.</p>
+        <ul>
+          <li><b>Testar Protótipo</b>: envia vídeo ou foto e recebe a altura estimada e o status (OK / ALERTA / CRÍTICO)</li>
+          <li><b>Dashboard</b>: KPIs, filtros por status e distância, leituras por trecho, localização, solicitação e agendamento de roçada</li>
+          <li><b>Cronograma</b>: sugestão de roçada por dia, ordenada por criticidade e proximidade</li>
+          <li><b>Mensagens</b>: conversa com encarregados e envio de solicitações de roçada</li>
+        </ul>
+      </div>
+      <div class="card profile enc">
+        <h2>Perfil B — Encarregado de roçada</h2>
+        <p>Líder da equipe de campo de uma rodovia. Consulta o que precisa ser roçado e se comunica com o gestor.</p>
+        <ul>
+          <li><b>Minha Agenda</b>: trechos da sua rodovia por criticidade, previsão e datas agendadas (somente leitura)</li>
+          <li><b>Mensagens</b>: recebe solicitações de roçada e responde ao gestor</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h2>Fluxos deste documento</h2>
+        <ol class="index">
+          <li>Acesso à plataforma (comum)</li>
+          <li>Gestor — visão geral</li>
+          <li>Gestor — Testar Protótipo</li>
+          <li>Gestor — Dashboard (4a consulta · 4b ações)</li>
+          <li>Gestor — Cronograma</li>
+          <li>Gestor — Mensagens</li>
+          <li>Encarregado — visão geral</li>
+          <li>Encarregado — Minha Agenda</li>
+          <li>Encarregado — Mensagens</li>
+          <li>Jornada integrada Gestor ↔ Encarregado</li>
+        </ol>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:5mm">
+      <div class="card">
+        <h2>Equipe</h2>
+        <table class="team">
+          <tr><th>Integrante</th><th>RM</th><th>Turma</th></tr>
+          <tr><td>André Ayello de Nobrega</td><td>561754</td><td>CCPG</td></tr>
+          <tr><td>André Gouveia de Lima</td><td>564219</td><td>CCPO</td></tr>
+          <tr><td>Caio Castelão Carminato</td><td>563630</td><td>CCPG</td></tr>
+          <tr><td>Guilherme Vasques Tamai</td><td>563276</td><td>CCPG</td></tr>
+          <tr><td>Mirella Mascarenhas</td><td>562092</td><td>CCPG</td></tr>
+          <tr><td>Vitor Komura de Freitas</td><td>563694</td><td>CCPG</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h2>Legenda dos símbolos</h2>
+        <div class="legend-big">
+          <span><svg width="46" height="22"><rect x="1" y="1" width="44" height="20" rx="10" fill="#a8e6b0" stroke="#3a9a48"/></svg>Início / Fim</span>
+          <span><svg width="46" height="22"><polygon points="8,1 45,1 38,21 1,21" fill="#ddd0f7" stroke="#8e6ccb"/></svg>Entrada / Saída de dados</span>
+          <span><svg width="46" height="22"><rect x="1" y="1" width="44" height="20" rx="3" fill="#d4e5fb" stroke="#5b8fd1"/></svg>Processo / Ação</span>
+          <span><svg width="46" height="26"><polygon points="23,1 45,13 23,25 1,13" fill="#fde69a" stroke="#d9a928"/></svg>Decisão</span>
+          <span><svg width="46" height="12"><line x1="2" y1="6" x2="38" y2="6" stroke="#333" stroke-width="2"/><polygon points="38,1 45,6 38,11" fill="#333"/></svg>Fluxo de navegação</span>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Regras que aparecem nos fluxos</h2>
+        <ul>
+          <li><b>Status da vegetação</b>: OK &lt; 10 cm · ALERTA 10–29 cm · CRÍTICO ≥ 30 cm</li>
+          <li><b>Login simulado</b> (demonstração, sem senha): o usuário escolhe “Entrar como” e o sistema direciona conforme o papel</li>
+          <li><b>Proteção de rotas</b>: cada perfil só acessa as páginas do seu menu; qualquer outra rota redireciona para a página inicial do perfil</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 1. ACESSO ============ -->
+<section class="page">
+  <div class="topbar"></div>
+  <header>
+    <div><span class="tag comum">Comum aos dois perfis</span>
+      <h1>1. Acesso à plataforma<small>Da entrada no site até a tela inicial de cada perfil</small></h1></div>
+    <div class="desc">O login é simulado para a demonstração: não há senha, o usuário escolhe a conta em “Entrar como”. Se já existe sessão salva, o sistema pula a escolha de conta.</div>
+  </header>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+  S(["Início"]):::se --> A1["Usuário acessa a plataforma VeroAI"]:::pr
+  A1 --> D1{"Já existe sessão salva no navegador?"}:::de
+  D1 -- Sim --> D3
+  D1 -- Não --> A2[/"Sistema carrega as contas disponíveis"/]:::io
+  A2 --> D2{"Contas carregadas?"}:::de
+  D2 -- Não --> A3[/"Exibe mensagem de erro: “Não foi possível carregar as contas”"/]:::io
+  A3 --> A4["Usuário recarrega a página"]:::pr
+  A4 --> A2
+  D2 -- Sim --> A5["Usuário clica em “Entrar como” e escolhe sua conta"]:::pr
+  A5 --> A6[/"Sistema salva a sessão do usuário"/]:::io
+  A6 --> D3{"Qual o papel do usuário?"}:::de
+  D3 -- Gestor --> G1["Sistema abre o Dashboard"]:::pr
+  G1 --> G2(["Segue para os fluxos do Gestor (2 a 6)"]):::se
+  D3 -- Encarregado --> E1["Sistema abre Mensagens"]:::pr
+  E1 --> E2(["Segue para os fluxos do Encarregado (7 a 9)"]):::se
+  </pre></div>
+  <footer><div class="legend"></div><span>VeroAI · Challenge Motiva</span></footer>
+</section>
+
+<!-- ============ 2. GESTOR VISÃO GERAL ============ -->
+<section class="page">
+  <div class="topbar"></div>
+  <header>
+    <div><span class="tag gestor">Perfil A · Gestor</span>
+      <h1>2. Gestor — visão geral<small>Navegação entre as funcionalidades e encerramento da sessão</small></h1></div>
+    <div class="desc">Menu do gestor: Testar Protótipo, Dashboard, Cronograma e Mensagens. Cada funcionalidade é detalhada nos fluxos 3 a 6.</div>
+  </header>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+  S(["Início: gestor autenticado"]):::se --> M[/"Sistema exibe o menu: Testar Protótipo · Dashboard · Cronograma · Mensagens"/]:::io
+  M --> D{"Qual funcionalidade deseja usar?"}:::de
+  D -- "Testar Protótipo" --> F2["Analisa vídeo ou foto da vegetação (fluxo 3)"]:::pr
+  D -- "Dashboard" --> F3["Consulta trechos e gerencia roçadas (fluxo 4)"]:::pr
+  D -- "Cronograma" --> F4["Planeja as roçadas por dia de trabalho (fluxo 5)"]:::pr
+  D -- "Mensagens" --> F5["Conversa com os encarregados (fluxo 6)"]:::pr
+  D -- "Digita endereço de página fora do perfil" --> R[/"Sistema redireciona para Testar Protótipo"/]:::io
+  R --> M
+  F2 --> D2{"Deseja realizar outra ação?"}:::de
+  F3 --> D2
+  F4 --> D2
+  F5 --> D2
+  D2 -- Sim --> M
+  D2 -- Não --> X["Clica em “Sair”"]:::pr
+  X --> X2[/"Sistema encerra a sessão"/]:::io
+  X2 --> E(["Fim: volta à tela de acesso"]):::se
+  </pre></div>
+  <footer><div class="legend"></div><span>VeroAI · Challenge Motiva</span></footer>
+</section>
+
+<!-- ============ 3. GESTOR TESTAR PROTÓTIPO ============ -->
+<section class="page">
+  <div class="topbar"></div>
+  <header>
+    <div><span class="tag gestor">Perfil A · Gestor</span>
+      <h1>3. Testar Protótipo — análise de vegetação<small>Envio de vídeo ou foto, processamento e resultado</small></h1></div>
+    <div class="desc">Vídeo: o sistema extrai 1 quadro a cada 2 segundos e calcula a média do trecho. Foto: leitura única com a régua de referência. O resultado é salvo e aparece no Dashboard.</div>
+  </header>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+  S(["Início"]):::se --> A2["Abre “Testar Protótipo” e clica em “Escolher vídeo ou foto”"]:::pr
+
+  A2 --> A3[/"Seleciona o arquivo; sistema exibe a prévia"/]:::io
+  A3 --> A4[/"Informa nome do trecho e km início / fim (opcionais)"/]:::io
+  A4 --> D1{"km fim ≥ km início?"}:::de
+  D1 -- Não --> B1[/"Exibe aviso e bloqueia o botão de análise"/]:::io
+  B1 --> A4
+  D1 -- Sim --> A5["Clica em “Analisar vegetação” / “Analisar foto”"]:::pr
+  A5 --> D2{"Tipo de arquivo?"}:::de
+  D2 -- Vídeo --> V1["Extrai 1 quadro a cada 2 s e estima a altura de cada um"]:::pr
+  D2 -- Foto --> P1["Estima a altura com a régua de referência"]:::pr
+  V1 --> D3{"Processamento concluído?"}:::de
+  P1 --> D3
+  D3 -- Não --> B2[/"Exibe mensagem de erro"/]:::io
+  B2 --> A2
+  D3 -- Sim --> C2[/"Classifica (OK · ALERTA · CRÍTICO) e exibe altura média e leituras"/]:::io
+
+  C2 --> C3[/"Salva a análise e atualiza o Dashboard"/]:::io
+  C3 --> D4{"Deseja analisar outro arquivo?"}:::de
+  D4 -- Sim --> A2
+  D4 -- Não --> Z(["Fim: volta ao menu do gestor"]):::se
+  </pre></div>
+  <footer><div class="legend"></div><span>VeroAI · Challenge Motiva</span></footer>
+</section>
+
+<!-- ============ 4a. GESTOR DASHBOARD CONSULTA ============ -->
+<section class="page">
+  <div class="topbar"></div>
+  <header>
+    <div><span class="tag gestor">Perfil A · Gestor</span>
+      <h1>4a. Dashboard — consulta de trechos<small>KPIs, filtros por status e distância e detalhes de cada trecho</small></h1></div>
+    <div class="desc">Os dados se atualizam sozinhos quando outro gestor processa um vídeo. O filtro por distância usa o ponto médio (km início–fim) de cada trecho.</div>
+  </header>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+  S(["Início: abre o Dashboard"]):::se --> A2[/"Sistema carrega os trechos analisados"/]:::io
+
+  A2 --> D1{"Dados carregados?"}:::de
+  D1 -- Não --> E1[/"Exibe mensagem de erro"/]:::io
+  E1 --> E2["Clica em “Atualizar”"]:::pr
+  E2 --> A2
+  D1 -- Sim --> A3[/"Exibe KPIs e alerta “N trechos em estado CRÍTICO”"/]:::io
+  A3 --> D2{"Deseja filtrar?"}:::de
+  D2 -- Sim --> F1["Filtra por status e/ou distância (km + raio)"]:::pr
+  F1 --> D3{"Algum trecho no filtro?"}:::de
+  D3 -- Não --> F2[/"Exibe “Nenhum trecho” e opção “Limpar”"/]:::io
+  F2 --> D2
+  D3 -- Sim --> L
+  D2 -- Não --> L[/"Exibe lista de trechos com status e situação da roçada"/]:::io
+  L --> A5[/"Clica em um trecho: sistema exibe leituras, recomendação e ações"/]:::io
+
+  A5 --> D4{"O que deseja fazer?"}:::de
+  D4 -- "Agir sobre o trecho" --> Z1(["Segue para o fluxo 4b"]):::se
+  D4 -- "Ver outro trecho" --> L
+  D4 -- "Encerrar" --> Z(["Fim: volta ao menu"]):::se
+
+  </pre></div>
+  <footer><div class="legend"></div><span>VeroAI · Challenge Motiva</span></footer>
+</section>
+
+<!-- ============ 4b. GESTOR DASHBOARD AÇÕES ============ -->
+<section class="page">
+  <div class="topbar"></div>
+  <header>
+    <div><span class="tag gestor">Perfil A · Gestor</span>
+      <h1>4b. Dashboard — ações sobre o trecho<small>Localização, solicitação e agendamento de roçada</small></h1></div>
+    <div class="desc">O atalho “Agendar o quanto antes” só aparece para trechos CRÍTICOS. Sem km cadastrado, o trecho não entra no Cronograma nem no filtro por distância.</div>
+  </header>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+  S(["Início: trecho aberto no Dashboard"]):::se --> D4{"Qual ação?"}:::de
+  D4 -- "Localização" --> B1["Cadastra ou edita km início / fim"]:::pr
+  D4 -- "Solicitar roçada" --> D5{"Já foi solicitada?"}:::de
+  D5 -- Não --> B2["Clica em “Solicitar roçada”"]:::pr
+  D5 -- Sim --> B3["Cancela a solicitação"]:::pr
+  D4 -- "Agendar roçada" --> D6{"Trecho CRÍTICO?"}:::de
+  D6 -- Sim --> B4["“Agendar o quanto antes”: sistema sugere a data"]:::pr
+  D6 -- Não --> B5["Escolhe a data manualmente"]:::pr
+  B1 --> B9[/"Sistema salva e atualiza o trecho na lista"/]:::io
+  B2 --> B9
+  B3 --> B9
+  B4 --> B9
+  B5 --> B9
+  B9 --> D7{"Nova ação?"}:::de
+  D7 -- Sim --> D4
+  D7 -- Não --> Z(["Fim: volta à lista (fluxo 4a)"]):::se
+  </pre></div>
+  <footer><div class="legend"></div><span>VeroAI · Challenge Motiva</span></footer>
+</section>
+
+<!-- ============ 5. GESTOR CRONOGRAMA ============ -->
+<section class="page">
+  <div class="topbar"></div>
+  <header>
+    <div><span class="tag gestor">Perfil A · Gestor</span>
+      <h1>5. Cronograma — planejamento da roçada<small>Sugestão de roçada por dia, priorizando criticidade e proximidade</small></h1></div>
+    <div class="desc">Trechos CRÍTICOS vêm primeiro; dentro do mesmo nível, trechos próximos são agrupados no mesmo dia. Só entram trechos com km cadastrado.</div>
+  </header>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+  S(["Início"]):::se --> A1["Abre o Cronograma"]:::pr
+  A1 --> A2[/"Informa a distância máxima por dia (km)"/]:::io
+  A2 --> A3["Clica em “Recalcular”"]:::pr
+  A3 --> A4["Sistema ordena por criticidade e agrupa trechos próximos por dia"]:::pr
+  A4 --> D1{"Há trechos com km cadastrado?"}:::de
+  D1 -- Não --> B1[/"Exibe aviso: cadastrar a localização no Dashboard"/]:::io
+  B1 --> B2(["Fim: vai ao Dashboard (fluxo 4)"]):::se
+  D1 -- Sim --> A5[/"Exibe o cronograma por dia: trechos, status, distância e previsão até ficar crítico"/]:::io
+  A5 --> D2{"Deseja agir sobre um trecho?"}:::de
+  D2 -- Sim --> D3{"Qual ação?"}:::de
+  D3 -- "Solicitação" --> C1["Solicita ou cancela a roçada"]:::pr
+  D3 -- "Agendamento" --> C2["Define, antecipa ou cancela a data"]:::pr
+  C1 --> C3[/"Sistema atualiza o item no cronograma"/]:::io
+  C2 --> C3
+  C3 --> D2
+  D2 -- Não --> D4{"Deseja ajustar a distância por dia?"}:::de
+  D4 -- Sim --> A2
+  D4 -- Não --> Z(["Fim: volta ao menu"]):::se
+  </pre></div>
+  <footer><div class="legend"></div><span>VeroAI · Challenge Motiva</span></footer>
+</section>
+
+<!-- ============ 6. GESTOR MENSAGENS ============ -->
+<section class="page">
+  <div class="topbar"></div>
+  <header>
+    <div><span class="tag gestor">Perfil A · Gestor</span>
+      <h1>6. Mensagens — comunicação com encarregados<small>Mensagens de texto e solicitações formais de roçada</small></h1></div>
+    <div class="desc">Enviar uma solicitação de roçada também agenda a data no trecho, que passa a aparecer na agenda do encarregado.</div>
+  </header>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+  S(["Início"]):::se --> A1["Abre Mensagens"]:::pr
+  A1 --> A2[/"Sistema lista os encarregados com a última mensagem"/]:::io
+  A2 --> A3["Seleciona um encarregado"]:::pr
+  A3 --> A4[/"Exibe a conversa e os trechos da rodovia do encarregado"/]:::io
+  A4 --> A5["Seleciona o trecho do assunto"]:::pr
+  A5 --> D1{"O que deseja enviar?"}:::de
+  D1 -- "Texto" --> T1[/"Digita e envia a mensagem"/]:::io
+  D1 -- "Solicitação de roçada" --> P1["Clica em “Solicitar roçada”"]:::pr
+  P1 --> P2[/"Sistema sugere a data e o texto da solicitação"/]:::io
+  P2 --> D2{"Confirma o envio?"}:::de
+  D2 -- Não --> P3["Clica em “Cancelar”"]:::pr
+  P3 --> D1
+  D2 -- Sim --> P4["Ajusta a data, se preciso, e clica em “Enviar solicitação”"]:::pr
+  P4 --> P5["Sistema agenda a roçada no trecho"]:::pr
+  T1 --> R[/"Mensagem registrada e visível para o encarregado"/]:::io
+  P5 --> R
+  R --> D3{"Deseja enviar outra mensagem?"}:::de
+  D3 -- Sim --> A3
+  D3 -- Não --> Z(["Fim: volta ao menu"]):::se
+  </pre></div>
+  <footer><div class="legend"></div><span>VeroAI · Challenge Motiva</span></footer>
+</section>
+
+<!-- ============ 7. ENCARREGADO VISÃO GERAL ============ -->
+<section class="page">
+  <div class="topbar"></div>
+  <header>
+    <div><span class="tag enc">Perfil B · Encarregado de roçada</span>
+      <h1>7. Encarregado — visão geral<small>Navegação entre as funcionalidades e encerramento da sessão</small></h1></div>
+    <div class="desc">O encarregado vê apenas os trechos da sua rodovia. Páginas do gestor (Dashboard, Cronograma, Testar Protótipo) ficam bloqueadas.</div>
+  </header>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+  S(["Início: encarregado autenticado"]):::se --> M[/"Sistema exibe o menu: Minha Agenda · Mensagens"/]:::io
+  M --> D{"Qual funcionalidade deseja usar?"}:::de
+  D -- "Minha Agenda" --> F1["Consulta os trechos sob sua responsabilidade (fluxo 8)"]:::pr
+  D -- "Mensagens" --> F2["Conversa com o gestor (fluxo 9)"]:::pr
+  D -- "Tenta abrir página do gestor" --> R[/"Sistema bloqueia e redireciona para Minha Agenda"/]:::io
+  R --> M
+  F1 --> D2{"Deseja realizar outra ação?"}:::de
+  F2 --> D2
+  D2 -- Sim --> M
+  D2 -- Não --> X["Clica em “Sair”"]:::pr
+  X --> X2[/"Sistema encerra a sessão"/]:::io
+  X2 --> E(["Fim: volta à tela de acesso"]):::se
+  </pre></div>
+  <footer><div class="legend"></div><span>VeroAI · Challenge Motiva</span></footer>
+</section>
+
+<!-- ============ 8. ENCARREGADO AGENDA ============ -->
+<section class="page">
+  <div class="topbar"></div>
+  <header>
+    <div><span class="tag enc">Perfil B · Encarregado de roçada</span>
+      <h1>8. Minha Agenda<small>Trechos da rodovia do encarregado, ordenados por criticidade</small></h1></div>
+    <div class="desc">Tela somente leitura: solicitações e agendamentos são feitos pelo gestor. A agenda se atualiza sozinha quando chega uma nova solicitação.</div>
+  </header>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+  S(["Início"]):::se --> A1["Abre Minha Agenda"]:::pr
+  A1 --> A2[/"Sistema carrega os trechos da sua rodovia"/]:::io
+  A2 --> D0{"Agenda carregada?"}:::de
+  D0 -- Não --> E1[/"Exibe mensagem de erro"/]:::io
+  E1 --> E2["Recarrega a página"]:::pr
+  E2 --> A2
+  D0 -- Sim --> D1{"Há trechos registrados?"}:::de
+  D1 -- Não --> N[/"Exibe “Nenhum trecho registrado ainda”"/]:::io
+  D1 -- Sim --> A3[/"Exibe cada trecho: status, altura, km e previsão até ficar crítico"/]:::io
+  A3 --> D2{"Trecho tem roçada agendada?"}:::de
+  D2 -- Sim --> B1[/"Exibe selo “Agendada · data”"/]:::io
+  B1 --> B2["Programa a equipe de campo para a data"]:::pr
+  D2 -- Não --> B3["Acompanha a evolução do trecho"]:::pr
+  N --> D3
+  B2 --> D3{"Precisa falar com o gestor?"}:::de
+  B3 --> D3
+  D3 -- Sim --> Z2(["Fim: vai para Mensagens (fluxo 9)"]):::se
+  D3 -- Não --> Z(["Fim: volta ao menu"]):::se
+  </pre></div>
+  <footer><div class="legend"></div><span>VeroAI · Challenge Motiva</span></footer>
+</section>
+
+<!-- ============ 9. ENCARREGADO MENSAGENS ============ -->
+<section class="page">
+  <div class="topbar"></div>
+  <header>
+    <div><span class="tag enc">Perfil B · Encarregado de roçada</span>
+      <h1>9. Mensagens — conversa com o gestor<small>Recebimento de solicitações de roçada e respostas</small></h1></div>
+    <div class="desc">O encarregado não cria solicitações de roçada: ele recebe as do gestor e responde com confirmação, dúvida ou relato de campo.</div>
+  </header>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+  S(["Início"]):::se --> A1["Abre Mensagens"]:::pr
+  A1 --> A2[/"Exibe a conversa com o gestor, incluindo solicitações de roçada"/]:::io
+  A2 --> D1{"Recebeu solicitação de roçada?"}:::de
+  D1 -- Sim --> B1[/"Card da solicitação: trecho, status, altura e data agendada"/]:::io
+  B1 --> B2["Confere a data em Minha Agenda"]:::pr
+  B2 --> D2
+  D1 -- Não --> D2{"Deseja responder ou relatar algo?"}:::de
+  D2 -- Sim --> C1["Seleciona o trecho relacionado"]:::pr
+  C1 --> C2[/"Digita e envia a mensagem (confirmação, dúvida, relato)"/]:::io
+  C2 --> C3[/"Mensagem registrada e visível para o gestor"/]:::io
+  C3 --> D3{"Deseja enviar outra mensagem?"}:::de
+  D3 -- Sim --> C1
+  D3 -- Não --> Z
+  D2 -- Não --> Z(["Fim: volta ao menu"]):::se
+  </pre></div>
+  <footer><div class="legend"></div><span>VeroAI · Challenge Motiva</span></footer>
+</section>
+
+<!-- ============ 10. JORNADA INTEGRADA ============ -->
+<section class="page">
+  <div class="topbar"></div>
+  <header>
+    <div><span class="tag comum">Gestor ↔ Sistema ↔ Encarregado</span>
+      <h1>10. Jornada integrada<small>Do vídeo gravado na rodovia até a roçada executada</small></h1></div>
+    <div class="desc">Cada raia mostra quem executa a etapa. Trechos em ALERTA também podem ser agendados de forma preventiva pelo gestor. Após a roçada, um novo vídeo do trecho fecha o ciclo.</div>
+  </header>
+  <div class="diagram"><svg class="hand" viewBox="0 0 1080 560" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif" font-size="13.5" fill="#123">
+    <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#333"/></marker></defs>
+    <rect x="0" y="0" width="1080" height="230" fill="#f1f6fd" stroke="#1f6fd1" stroke-width="1.5"/>
+    <rect x="0" y="230" width="1080" height="140" fill="#f6f7f9" stroke="#8a93a3" stroke-width="1.5"/>
+    <rect x="0" y="370" width="1080" height="190" fill="#fff6ea" stroke="#e08a1e" stroke-width="1.5"/>
+    <rect x="0" y="0" width="90" height="230" fill="#dbe9fb" stroke="#1f6fd1" stroke-width="1.5"/>
+    <rect x="0" y="230" width="90" height="140" fill="#e4e7ec" stroke="#8a93a3" stroke-width="1.5"/>
+    <rect x="0" y="370" width="90" height="190" fill="#fde7cc" stroke="#e08a1e" stroke-width="1.5"/>
+    <g font-weight="700" font-size="14" text-anchor="middle">
+      <text x="45" y="120" fill="#1b4f93">Gestor</text>
+      <text x="45" y="296" fill="#3b4556">Sistema</text><text x="45" y="313" fill="#3b4556">VeroAI</text>
+      <text x="45" y="468" fill="#8a4b00">Encarregado</text>
+    </g>
+    <g stroke="#333" stroke-width="1.7" fill="none" marker-end="url(#ar)">
+      <line x1="260" y1="70" x2="298" y2="70"/>
+      <line x1="370" y1="95" x2="370" y2="273"/>
+      <line x1="440" y1="300" x2="480" y2="300"/>
+      <line x1="550" y1="275" x2="550" y2="97"/>
+      <line x1="620" y1="70" x2="653" y2="70"/>
+      <line x1="805" y1="70" x2="838" y2="70"/>
+      <line x1="730" y1="110" x2="730" y2="153"/>
+      <line x1="910" y1="95" x2="910" y2="273"/>
+      <line x1="910" y1="325" x2="910" y2="403"/>
+      <line x1="838" y1="430" x2="802" y2="430"/>
+      <line x1="660" y1="430" x2="622" y2="430"/>
+      <line x1="480" y1="430" x2="442" y2="430"/>
+    </g>
+    <g font-size="12" font-weight="600" text-anchor="middle">
+      <text x="815" y="36">CRÍTICO</text>
+      <rect x="738" y="124" width="80" height="16" fill="#fff"/><text x="778" y="136">OK / ALERTA</text>
+    </g>
+    <g stroke-width="1.5">
+      <rect x="120" y="45" width="140" height="50" rx="25" fill="#a8e6b0" stroke="#3a9a48"/>
+      <rect x="300" y="45" width="140" height="50" rx="4" fill="#d4e5fb" stroke="#5b8fd1"/>
+      <rect x="300" y="275" width="140" height="50" rx="4" fill="#d4e5fb" stroke="#5b8fd1"/>
+      <polygon points="494,275 624,275 610,325 480,325" fill="#ddd0f7" stroke="#8e6ccb"/>
+      <rect x="480" y="45" width="140" height="50" rx="4" fill="#d4e5fb" stroke="#5b8fd1"/>
+      <polygon points="730,30 805,70 730,110 655,70" fill="#fde69a" stroke="#d9a928"/>
+      <rect x="840" y="45" width="140" height="50" rx="4" fill="#d4e5fb" stroke="#5b8fd1"/>
+      <rect x="645" y="155" width="170" height="50" rx="25" fill="#a8e6b0" stroke="#3a9a48"/>
+      <polygon points="850,275 1000,275 986,325 836,325" fill="#ddd0f7" stroke="#8e6ccb"/>
+      <polygon points="850,405 1000,405 986,455 836,455" fill="#ddd0f7" stroke="#8e6ccb"/>
+      <rect x="660" y="405" width="140" height="50" rx="4" fill="#d4e5fb" stroke="#5b8fd1"/>
+      <rect x="480" y="405" width="140" height="50" rx="4" fill="#d4e5fb" stroke="#5b8fd1"/>
+      <rect x="290" y="400" width="150" height="60" rx="30" fill="#a8e6b0" stroke="#3a9a48"/>
+    </g>
+    <g text-anchor="middle">
+      <text x="190" y="66">Início: vídeo</text><text x="190" y="83">gravado na rodovia</text>
+      <text x="370" y="66">Envia o vídeo em</text><text x="370" y="83">Testar Protótipo</text>
+      <text x="370" y="296">Processa quadros e</text><text x="370" y="313">estima a altura</text>
+      <text x="552" y="296">Classifica o trecho</text><text x="552" y="313">e salva o resultado</text>
+      <text x="550" y="66">Consulta Dashboard</text><text x="550" y="83">e Cronograma</text>
+      <text x="730" y="66">Status do</text><text x="730" y="83">trecho?</text>
+      <text x="910" y="66">Envia solicitação</text><text x="910" y="83">de roçada</text>
+      <text x="730" y="176">Fim: monitora a previsão</text><text x="730" y="193">e reanalisa depois</text>
+      <text x="918" y="296">Agenda a data e</text><text x="918" y="313">registra a mensagem</text>
+      <text x="918" y="426">Vê a solicitação em</text><text x="918" y="443">Mensagens e Agenda</text>
+      <text x="730" y="426">Executa a roçada</text><text x="730" y="443">na data agendada</text>
+      <text x="550" y="426">Confirma ao gestor</text><text x="550" y="443">por Mensagens</text>
+      <text x="365" y="422">Fim: novo vídeo</text><text x="365" y="439">do trecho atualiza</text><text x="365" y="456">o status</text>
+    </g>
+  </svg></div>
+  <footer><div class="legend"></div><span>VeroAI · Challenge Motiva</span></footer>
+</section>
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+  import elkLayouts from "https://cdn.jsdelivr.net/npm/@mermaid-js/layout-elk@0/dist/mermaid-layout-elk.esm.min.mjs";
+  mermaid.registerLayoutLoaders(elkLayouts);
+  const defs = `
+  classDef se fill:#a8e6b0,stroke:#3a9a48,stroke-width:1.5px,color:#123;
+  classDef pr fill:#d4e5fb,stroke:#5b8fd1,stroke-width:1.5px,color:#123;
+  classDef io fill:#ddd0f7,stroke:#8e6ccb,stroke-width:1.5px,color:#123;
+  classDef de fill:#fde69a,stroke:#d9a928,stroke-width:1.5px,color:#123;
+  linkStyle default stroke:#333,stroke-width:1.6px;`;
+  mermaid.initialize({
+    startOnLoad: false, theme: "base", htmlLabels: false,
+    themeVariables: { fontFamily: "Segoe UI, Arial, sans-serif", fontSize: "15px",
+      edgeLabelBackground: "#ffffff", lineColor: "#333", primaryTextColor: "#123" },
+    flowchart: { curve: "linear", nodeSpacing: 22, rankSpacing: 24, padding: 8, htmlLabels: false, wrappingWidth: 125 }
+  });
+  // renderiza cada diagrama em TD e LR e fica com a orientação que ocupa melhor a área
+  let n = 0;
+  for (const pre of document.querySelectorAll("pre.mermaid")) {
+    const box = pre.parentElement, page = box.closest(".page");
+    const src = pre.textContent + defs;
+    pre.style.display = "none";
+    const areaL = [box.clientWidth, box.clientHeight];
+    page.classList.add("portrait");
+    const areaP = [box.clientWidth, box.clientHeight];
+    page.classList.remove("portrait");
+    const dirs = pre.dataset.dir ? [pre.dataset.dir] : ["TD", "LR"];
+    let best = null;
+    const combos = [];
+    for (const dir of dirs) for (const lay of ["dagre"]) combos.push([dir, lay]);
+    for (const [dir, lay] of combos) {
+      const code = `---\nconfig:\n  layout: ${lay}\n---\n` + src.replace(/flowchart (TD|LR)/, "flowchart " + dir);
+      try {
+        const { svg } = await mermaid.render("m" + (n++), code);
+        const tmp = document.createElement("div"); tmp.innerHTML = svg;
+        const el = tmp.querySelector("svg"); const vb = el.viewBox.baseVal;
+        for (const [orient, [W, H]] of [["L", areaL], ["P", areaP]]) {
+          const sc = Math.min(W / vb.width, H / vb.height, 1.5);
+          if (!best || sc > best.sc * 1.03) best = { el, vb, sc, orient, dir, lay };
+        }
+      } catch (e) { box.insertAdjacentHTML("beforeend", "<p style='color:red'>" + dir + ": " + e.message + "</p>"); }
+    }
+    pre.remove();
+    if (best) {
+      if (best.orient === "P") page.classList.add("portrait");
+      best.el.removeAttribute("style");
+      best.el.setAttribute("width", best.vb.width * best.sc); best.el.setAttribute("height", best.vb.height * best.sc);
+      box.appendChild(best.el);
+      page.dataset.info = best.dir + " " + best.lay + " " + best.orient + " " + best.sc.toFixed(2);
+    }
+  }
+  // legenda compacta no rodapé
+  const leg = `<span><svg width="30" height="14"><rect x="1" y="1" width="28" height="12" rx="6" fill="#a8e6b0" stroke="#3a9a48"/></svg>Início/Fim</span>
+    <span><svg width="30" height="14"><rect x="1" y="1" width="28" height="12" rx="2" fill="#d4e5fb" stroke="#5b8fd1"/></svg>Processo/Ação</span>
+    <span><svg width="30" height="14"><polygon points="6,1 29,1 24,13 1,13" fill="#ddd0f7" stroke="#8e6ccb"/></svg>Entrada/Saída</span>
+    <span><svg width="22" height="16"><polygon points="11,1 21,8 11,15 1,8" fill="#fde69a" stroke="#d9a928"/></svg>Decisão</span>
+    <span><svg width="28" height="10"><line x1="1" y1="5" x2="22" y2="5" stroke="#333" stroke-width="1.6"/><polygon points="22,1 27,5 22,9" fill="#333"/></svg>Fluxo</span>`;
+  document.querySelectorAll("footer .legend").forEach(l => l.innerHTML = leg);
+  // pré-visualização: ?p=N mostra só a página N
+  const only = new URLSearchParams(location.search).get("p");
+  if (only) document.querySelectorAll(".page").forEach((pg, i) => { if (i + 1 != only) pg.style.display = "none"; });
+  document.body.setAttribute("data-ready", "1");
+</script>
+</body>
+</html>
