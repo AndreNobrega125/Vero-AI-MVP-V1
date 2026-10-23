@@ -39,7 +39,7 @@ if not exist backend\data\veroai.db (
 )
 
 if not exist frontend\node_modules (
-  echo [4/4] Instalando dependencias do site (so na primeira vez demora)...
+  echo [4/4] Instalando dependencias do site, so na primeira vez demora...
   pushd frontend
   call npm install || (popd & pause & exit /b 1)
   popd
